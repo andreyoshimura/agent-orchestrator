@@ -1,0 +1,12 @@
+budgets:
+  openai:
+    daily_usd_env: BUDGET_OPENAI_DAILY_USD
+  gemini:
+    daily_usd_env: BUDGET_GEMINI_DAILY_USD
+  claude:
+    daily_usd_env: BUDGET_CLAUDE_DAILY_USD
+limits:
+  max_context_files:
+    claude_env: MAX_CONTEXT_FILES_CLAUDE
+    gemini_env: MAX_CONTEXT_FILES_GEMINI
+    openai_env: MAX_CONTEXT_FILES_OPENAI
