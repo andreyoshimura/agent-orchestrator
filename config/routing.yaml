@@ -1,0 +1,22 @@
+routing:
+  explain-file:
+    preferred: claude
+    fallback: [gemini, openai]
+  review-snippet:
+    preferred: claude
+    fallback: [gemini, openai]
+  review-diff:
+    preferred: gemini
+    fallback: [claude, openai]
+  map-dependencies:
+    preferred: gemini
+    fallback: [openai]
+  summarize-module:
+    preferred: gemini
+    fallback: [claude, openai]
+  compare-options:
+    preferred: openai
+    fallback: [gemini]
+  final-decision:
+    preferred: openai
+    fallback: [gemini]
