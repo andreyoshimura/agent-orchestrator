@@ -1,44 +1,44 @@
 # agent-orchestrator
 
-Generic multi-provider AI and agent orchestrator for local repositories.
+Orquestrador genérico de IA e agentes com múltiplos providers para repositórios locais.
 
-## Goals
+## Objetivos
 
-- Route tasks across multiple AI providers
-- Control budget and token usage
-- Keep project-specific memory outside the core runtime
-- Stay plug-and-play and reversible
-- Default to read-only access on target repositories
+- Rotear tarefas entre múltiplos providers de IA
+- Controlar orçamento e uso de tokens
+- Manter a memória específica de cada projeto fora do runtime central
+- Permanecer plug-and-play e reversível
+- Usar acesso somente leitura por padrão nos repositórios-alvo
 
-## Design principles
+## Princípios de design
 
-- Read-only by default
-- No provider-to-provider free chat
-- The orchestrator is the only component allowed to pass structured summaries between agents
-- Target repository path is configured externally
-- Provider fallback is rule-based
-- Project-specific prompts and memory live under `projects/<project_id>/`
+- Somente leitura por padrão
+- Sem conversa livre entre providers
+- O orchestrator é o único componente autorizado a repassar resumos estruturados entre agentes
+- O caminho do repositório-alvo é configurado externamente
+- O fallback entre providers é baseado em regras
+- Prompts e memória específicos do projeto ficam em `projects/<project_id>/`
 
-## Execution policy
+## Política de execução
 
-- per-task provider preference and fallbacks live in `config/routing.yaml`
-- retry and fallback behavior is also configured per task under `routing.<task>.execution`
-- the core keeps safe defaults, but task-specific policy should be adjusted in config instead of hardcoded in runtime logic
+- As preferências e fallbacks de provider por tarefa ficam em `config/routing.yaml`
+- O comportamento de retry e fallback também é configurado por tarefa em `routing.<task>.execution`
+- O core mantém defaults seguros, mas a política específica de cada tarefa deve ser ajustada na configuração, não codificada diretamente no runtime
 
-## Operational persistence
+## Persistência operacional
 
-- the latest task result per project/task is persisted under `var/state`
-- summarized task execution fingerprints are cached under `var/cache`
-- daily provider budget usage is persisted under `var/state`
-- this persistence is local and reversible; it is intended to reduce repeated manual inspection work between runs
+- O resultado mais recente de cada tarefa por projeto é persistido em `var/state`
+- Fingerprints resumidos de execução de tarefas são armazenados em cache em `var/cache`
+- O uso diário de orçamento por provider é persistido em `var/state`
+- Essa persistência é local e reversível; ela existe para reduzir trabalho manual repetido de inspeção entre execuções
 
-## Planned provider roles
+## Papéis planejados dos providers
 
-- **Claude free**: small local review, snippet analysis, second opinion
-- **Gemini**: broad repo analysis, dependency mapping, larger refactor planning
-- **OpenAI**: arbitration, synthesis, final decision
+- **Claude free**: review local pequeno, análise de snippets, segunda opinião
+- **Gemini**: análise ampla do repositório, mapeamento de dependências, planejamento de refactors maiores
+- **OpenAI**: arbitragem, síntese, decisão final
 
-## Initial tasks
+## Tarefas iniciais
 
 - `explain-file`
 - `review-snippet`
@@ -48,19 +48,19 @@ Generic multi-provider AI and agent orchestrator for local repositories.
 - `compare-options`
 - `final-decision`
 
-## Local workflow
+## Fluxo local
 
-- `bash scripts/task.sh inspect-project` inspects the active project profile and validates its linked files
-- `bash scripts/task.sh inspect-task <task-type> '<json>'` previews routing, selected files, local plan and provider usability for any task
-- `bash scripts/task.sh inspect-budget` shows current daily spend/remaining budget by provider
-- `bash scripts/task.sh diagnose-orchestrator` shows project/runtime/config/storage diagnostics
-- `bash scripts/task.sh assemble-context <task-type> '<json>'` builds reusable task context from global + project sources
-- `bash scripts/task.sh list-python-files` lists Python files from the configured target repository
-- `bash scripts/task.sh pick-python-file <query>` ranks Python files by partial name
-- `bash scripts/task.sh explain-best-python-match <query>` selects and previews the best Python match
-- `bash scripts/task.sh review-best-python-match <query>` selects and reviews the best Python match
+- `bash scripts/task.sh inspect-project` inspeciona o profile ativo do projeto e valida os arquivos associados
+- `bash scripts/task.sh inspect-task <task-type> '<json>'` mostra uma prévia do roteamento, arquivos selecionados, plano local e disponibilidade dos providers para qualquer tarefa
+- `bash scripts/task.sh inspect-budget` mostra o gasto diário atual e o orçamento restante por provider
+- `bash scripts/task.sh diagnose-orchestrator` mostra diagnósticos de projeto, runtime, configuração e armazenamento
+- `bash scripts/task.sh assemble-context <task-type> '<json>'` monta um contexto reutilizável de tarefa a partir de fontes globais e do projeto
+- `bash scripts/task.sh list-python-files` lista os arquivos Python do repositório-alvo configurado
+- `bash scripts/task.sh pick-python-file <query>` ranqueia arquivos Python por nome parcial
+- `bash scripts/task.sh explain-best-python-match <query>` seleciona e mostra a prévia estrutural do melhor match Python
+- `bash scripts/task.sh review-best-python-match <query>` seleciona e faz review do melhor match Python
 
-## Repository structure
+## Estrutura do repositório
 
 ```text
 agent-orchestrator/
@@ -83,18 +83,18 @@ agent-orchestrator/
   README.md
 ```
 
-## Safety defaults
+## Defaults de segurança
 
 - `AI_REPO_WRITE_ENABLED=false`
-- provider usage is optional and controlled by env/config
-- project repository is referenced by path, not embedded into this repository
-- this repository can be removed without touching the target project
+- o uso de providers é opcional e controlado por env/config
+- o repositório do projeto é referenciado por caminho, não embutido neste repositório
+- este repositório pode ser removido sem tocar no projeto-alvo
 
-## Profile selection
+## Seleção de profile
 
-- `AI_DEFAULT_PROJECT` selects the active project profile
-- `AI_PROJECTS_ROOT` can point to an alternate profiles directory when validating multiple project profiles locally
+- `AI_DEFAULT_PROJECT` seleciona o profile ativo do projeto
+- `AI_PROJECTS_ROOT` pode apontar para um diretório alternativo de profiles ao validar múltiplos projetos localmente
 
-## Next step
+## Próximo passo
 
-Copy `.env.example` to `.env`, adjust the provider keys you want to use, and configure `projects/ia-trade/project.yaml` with the local target repo path.
+Copie `.env.example` para `.env`, ajuste as chaves dos providers que deseja usar e configure `projects/ia-trade/project.yaml` com o caminho local do repositório-alvo.
