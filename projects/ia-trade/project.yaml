@@ -1,0 +1,13 @@
+project_id: ia-trade
+display_name: IA-Trade
+repo_path_env: AI_TARGET_REPO
+write_enabled_env: AI_REPO_WRITE_ENABLED
+default_mode: read-only
+agent_profile: engineering
+memory_files:
+  - projects/ia-trade/memory/facts.md
+  - projects/ia-trade/memory/guardrails.md
+prompt_files:
+  repo_worker: projects/ia-trade/prompts/repo_worker.md
+  micro_reviewer: projects/ia-trade/prompts/micro_reviewer.md
+  arbiter: projects/ia-trade/prompts/arbiter.md

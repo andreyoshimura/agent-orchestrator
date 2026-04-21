@@ -1,0 +1,6 @@
+.codex
+.env
+.venv/
+__pycache__/
+*.pyc
+var/
