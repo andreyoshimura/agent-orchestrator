@@ -65,22 +65,20 @@
 
 ## Encerramento do dia
 
-- data do checkpoint: `2026-04-21`
+- data do checkpoint: `2026-04-22`
 - último bloco concluído:
-  - persistência diária de budget
-  - diagnósticos operacionais
-  - `inspect-task`
-  - suporte/testes para múltiplos profiles via `AI_PROJECTS_ROOT`
-  - cobertura dos comandos CLI com profile alternativo
-  - consolidação de aliases legados (`explain-file`, `review-file`) sobre o fluxo genérico
-  - consolidação de alias legado (`summarize-repo-area`) sobre o fluxo genérico
-  - consolidação de aliases legados (`pick-python-file`, `explain-best-python-match`, `review-best-python-match`) sobre o fluxo genérico
-  - documentação do workflow recomendado de uso local
-  - decisão de manter `map-dependencies` como ferramenta estrutural dedicada
+  - fechamento do bloco de `dependency_map` com `call_relations`, `target_symbols`, `call_relation_summary`, `risk_flags` e `dependency_highlights`
+  - parser de payload JSON centralizado nos entrypoints
+  - execução live também para `claude` e `gemini` (além de `openai`), com fallback para `stub` quando não configurado
+  - suporte opcional a override de endpoint por provider via `*_API_BASE`
+  - robustez adicional de providers para exceções internas e resposta JSON inválida/shape inesperado
+  - cobertura de testes ampliada para providers e para payload inválido/não-objeto nos entrypoints
+  - commits publicados em `main`: `1bd020d`, `bd718a0`, `9ea1a51`, `4a4d75b`
+  - suíte passando: `python3 -m unittest -q` com `81` testes (`OK`)
 - ponto exato para retomar amanhã:
-  - ampliar cenários de erro também nos entrypoints CLI além do payload inválido já coberto
-  - manter cobertura explícita para profile inválido e para execução com target repo não configurado
-  - depois revisar se vale criar um task-type genérico de análise estrutural para reduzir a excepcionalidade de `map-dependencies`
+  - consolidar cenários restantes de confiabilidade no core (`TaskRunner` + `OperationalStore`) com foco em fluxos degradados/fallback
+  - endurecer providers para respostas parciais (JSON válido, mas sem campos esperados) com erro estruturado consistente
+  - revisar se vale criar task-type genérico de análise estrutural para reduzir a excepcionalidade de `map-dependencies`
 
 ## Arquivos-chave para retomar rápido
 
