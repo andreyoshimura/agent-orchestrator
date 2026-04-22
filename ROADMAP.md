@@ -56,8 +56,8 @@
 
 ### O que ainda está incompleto
 
-- providers ainda são stubs
 - agentes ainda são stubs
+- integração de providers ainda é síncrona e sem streaming
 - `TaskRunner` ainda planeja, mas não executa um workflow completo
 - seleção de contexto ainda é básica e pouco orientada por tarefa
 - budget/estado não persistem por dia entre execuções
@@ -86,7 +86,7 @@
 
 - `[~]` transformar `TaskRunner` em executor real de pipeline
 - `[~]` conectar agentes ao carregamento de prompts e memória do projeto
-- `[~]` padronizar interface de providers além do status `stub`
+- `[x]` padronizar interface de providers além do status `stub`
 - `[~]` adicionar fallback real entre providers
 - `[~]` externalizar retry/fallback policy para configuração por tarefa
 
@@ -106,7 +106,6 @@
 - `[~]` ampliar testes para comandos, ranking e montagem de contexto
 - `[x]` cobrir cenários sem `AI_TARGET_REPO` e sem profile válido nos entrypoints genéricos
 - `[~]` cobrir payload JSON inválido e payload não-objeto nos entrypoints genéricos
-- `[ ]` validar comportamento com múltiplos profiles além de `ia-trade`
 - `[x]` validar comportamento com múltiplos profiles além de `ia-trade`
 - `[x]` documentar workflow recomendado de uso local
 
@@ -136,6 +135,10 @@
   - `call_relation_summary` adiciona leitura executiva por prioridade e top relação detectada
   - `call_relation_summary` agora inclui `risk_flags` para sinalizar relações não resolvidas com maior criticidade
   - `inspect-task` e `assemble-context` agora incluem `dependency_highlights` para consumo operacional rápido
+- cobertura ampliada de providers:
+  - `openai`, `gemini` e `claude` agora suportam execução live via HTTP quando `model` e `api_key` estão configurados
+  - classificação de erro HTTP por tipo (`rate_limit`, `authorization`, `invalid_request`, `temporary`)
+  - `*_API_BASE` opcional para override de endpoint por provider
 
 ## Evidências do que foi baixado
 

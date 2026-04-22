@@ -18,6 +18,8 @@
 - qualquer regra específica de projeto deve permanecer isolada em `projects/<project_id>/`
 - o runtime agora pode trocar a raiz de profiles via `AI_PROJECTS_ROOT`
 - a suíte já valida um segundo profile além de `ia-trade` usando raiz temporária
+- `openai`, `gemini` e `claude` agora suportam execução live quando configurados (`model` + `api_key`)
+- cada provider agora aceita override opcional de endpoint via `*_API_BASE`
 
 ## Próximo foco
 
@@ -38,6 +40,7 @@
 - adicionar `call_relation_summary` para leitura executiva de risco estrutural
 - sinalizar `risk_flags` para relações não resolvidas de maior impacto
 - incluir `dependency_highlights` para leitura rápida em entrypoints genéricos
+- ampliar confiabilidade de providers em cenários de resposta parcial (campos ausentes no JSON de retorno)
 
 ## Checkpoint de retomada
 

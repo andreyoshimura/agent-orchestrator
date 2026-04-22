@@ -89,6 +89,7 @@ set -a && source .env && set +a
 - ajuste `AI_TARGET_REPO` para o caminho local do repositório-alvo
 - mantenha `AI_REPO_WRITE_ENABLED=false` por padrão
 - preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
+- use `OPENAI_API_BASE`, `GEMINI_API_BASE` e `CLAUDE_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
 
 ### 2. Retomar sessão
 
