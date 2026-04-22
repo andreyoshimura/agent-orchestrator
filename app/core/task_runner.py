@@ -76,13 +76,12 @@ class TaskRunner:
                 fallback_on=decision.fallback_on,
             )
             attempted_providers.extend(provider_attempts)
+            provider_result = current_result
 
             if should_accept_provider_result(current_result["status"]):
                 chosen_provider = provider_name
-                provider_result = current_result
                 break
             if not should_continue_to_fallback:
-                provider_result = current_result
                 break
 
         if not chosen_provider:
@@ -230,7 +229,27 @@ class TaskRunner:
                 "status": "skipped",
                 "output": {"reason": "local plan unavailable"},
             }
-        provider = get_provider(provider_name, self.provider_settings[provider_name])
+        settings = self.provider_settings.get(provider_name)
+        if settings is None:
+            return {
+                "provider": provider_name,
+                "status": "error",
+                "output": {
+                    "reason": f"provider settings not found for '{provider_name}'",
+                    "failure_type": "configuration",
+                },
+            }
+        try:
+            provider = get_provider(provider_name, settings)
+        except KeyError as exc:
+            return {
+                "provider": provider_name,
+                "status": "error",
+                "output": {
+                    "reason": str(exc),
+                    "failure_type": "provider_unavailable",
+                },
+            }
         response = provider.run(
             ProviderRequest(
                 prompt=str(getattr(local_plan, "prompt_text", "")),

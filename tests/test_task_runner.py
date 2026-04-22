@@ -157,6 +157,61 @@ class TaskRunnerTest(unittest.TestCase):
             _restore_env("AI_DEFAULT_PROJECT", old_project)
             _restore_env("AI_TARGET_REPO", old_target)
 
+    def test_inspect_marks_context_partial_when_target_repo_path_is_missing(self) -> None:
+        old_project = os.environ.get("AI_DEFAULT_PROJECT")
+        old_target = os.environ.get("AI_TARGET_REPO")
+        try:
+            os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+            os.environ["AI_TARGET_REPO"] = "/tmp/path-that-should-not-exist-agent-orchestrator"
+
+            runner = TaskRunner(
+                router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+                budget_manager=BudgetManager({"claude": 1.0}),
+                provider_settings={
+                    "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                },
+            )
+            inspection = runner.inspect(
+                TaskRequest(
+                    task_type="review-file",
+                    payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                )
+            )
+
+            self.assertEqual(inspection["context"]["status"], "partial")
+            self.assertIn("target repo path not found", inspection["context"]["reason"])
+            self.assertEqual(inspection["local_plan"]["status"], "partial")
+            self.assertEqual(inspection["local_plan"]["selected_files"], [])
+        finally:
+            _restore_env("AI_DEFAULT_PROJECT", old_project)
+            _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_inspect_returns_unavailable_when_project_profile_is_missing(self) -> None:
+        old_project = os.environ.get("AI_DEFAULT_PROJECT")
+        try:
+            os.environ["AI_DEFAULT_PROJECT"] = "missing-project"
+
+            runner = TaskRunner(
+                router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+                budget_manager=BudgetManager({"claude": 1.0}),
+                provider_settings={
+                    "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                },
+            )
+            inspection = runner.inspect(
+                TaskRequest(
+                    task_type="review-file",
+                    payload={"project_id": "missing-project", "query": "paper"},
+                )
+            )
+
+            self.assertEqual(inspection["context"]["status"], "unavailable")
+            self.assertEqual(inspection["context"]["reason"], "project profile not found")
+            self.assertEqual(inspection["local_plan"]["status"], "unavailable")
+            self.assertEqual(inspection["providers"][0]["provider"], "claude")
+        finally:
+            _restore_env("AI_DEFAULT_PROJECT", old_project)
+
     def test_run_uses_alternate_project_root_from_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root = Path(tmpdir) / "profiles"
@@ -420,6 +475,78 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(result.provider, "gemini")
                 self.assertEqual(result.status, "degraded")
                 self.assertEqual(len(result.output["provider_attempts"]), 2)
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_run_degrades_when_provider_settings_are_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "openai", "fallback": []}}),
+                    budget_manager=BudgetManager({"openai": 1.0}),
+                    provider_settings={},
+                )
+                result = runner.run(
+                    TaskRequest(
+                        task_type="review-file",
+                        payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                    )
+                )
+
+                self.assertEqual(result.provider, "openai")
+                self.assertEqual(result.status, "degraded")
+                self.assertEqual(
+                    result.output["provider_attempts"],
+                    [{"provider": "openai", "attempt": 1, "status": "error", "failure_type": "configuration"}],
+                )
+                self.assertEqual(result.output["provider_result"]["output"]["failure_type"], "configuration")
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_run_falls_back_when_provider_name_is_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "missing-provider", "fallback": ["claude"], "execution": {"max_provider_retries": 0, "fallback_on": ["provider_unavailable"]}}}),
+                    budget_manager=BudgetManager({"missing-provider": 1.0, "claude": 1.0}),
+                    provider_settings={
+                        "missing-provider": ProviderSettings(name="missing-provider", enabled=True, model="", api_key="", api_base=""),
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                )
+                result = runner.run(
+                    TaskRequest(
+                        task_type="review-file",
+                        payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                    )
+                )
+
+                self.assertEqual(result.provider, "claude")
+                self.assertEqual(result.status, "stub")
+                self.assertEqual(result.output["provider_attempts"][0]["provider"], "missing-provider")
+                self.assertEqual(result.output["provider_attempts"][0]["failure_type"], "provider_unavailable")
+                self.assertEqual(result.output["provider_attempts"][1]["provider"], "claude")
+                self.assertEqual(result.output["provider_attempts"][1]["failure_type"], "success")
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)

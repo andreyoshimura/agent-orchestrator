@@ -56,9 +56,89 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 - `bash scripts/task.sh diagnose-orchestrator` mostra diagnósticos de projeto, runtime, configuração e armazenamento
 - `bash scripts/task.sh assemble-context <task-type> '<json>'` monta um contexto reutilizável de tarefa a partir de fontes globais e do projeto
 - `bash scripts/task.sh list-python-files` lista os arquivos Python do repositório-alvo configurado
-- `bash scripts/task.sh pick-python-file <query>` ranqueia arquivos Python por nome parcial
-- `bash scripts/task.sh explain-best-python-match <query>` seleciona e mostra a prévia estrutural do melhor match Python
-- `bash scripts/task.sh review-best-python-match <query>` seleciona e faz review do melhor match Python
+
+## Aliases legados
+
+- `bash scripts/task.sh explain-file <file>` continua disponível, mas agora delega para `assemble-context explain-file`
+- `bash scripts/task.sh review-file <file>` continua disponível, mas agora delega para `inspect-task review-file`
+- `bash scripts/task.sh summarize-repo-area [files...]` continua disponível, mas agora delega para `assemble-context summarize-module`
+- `bash scripts/task.sh pick-python-file <query>` continua disponível, mas agora delega para `inspect-task review-file` para inspecionar a seleção automática
+- `bash scripts/task.sh explain-best-python-match <query>` continua disponível, mas agora delega para `assemble-context explain-file`
+- `bash scripts/task.sh review-best-python-match <query>` continua disponível, mas agora delega para `inspect-task review-file`
+
+## Comandos ainda dedicados
+
+- `bash scripts/task.sh map-dependencies <file.py>` continua como comando dedicado porque faz parsing estrutural de imports, não apenas seleção de contexto
+
+## Recomendações de uso
+
+- prefira `inspect-task` quando quiser entender roteamento, seleção automática de arquivos e plano local
+- prefira `assemble-context` quando quiser ver o contexto reutilizável que será entregue ao fluxo central
+- use `PYTHON_BIN=/caminho/do/python bash scripts/task.sh ...` se precisar forçar um interpretador específico
+
+## Workflow local recomendado
+
+### 1. Preparar ambiente
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a
+```
+
+- ajuste `AI_DEFAULT_PROJECT` se quiser trocar o profile ativo
+- ajuste `AI_TARGET_REPO` para o caminho local do repositório-alvo
+- mantenha `AI_REPO_WRITE_ENABLED=false` por padrão
+- preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
+
+### 2. Retomar sessão
+
+```bash
+bash scripts/task.sh inspect-project
+bash scripts/task.sh diagnose-orchestrator
+bash scripts/task.sh inspect-budget
+```
+
+- `inspect-project` valida profile, arquivos do projeto e repo alvo
+- `diagnose-orchestrator` mostra estado de projeto, storage e execuções recentes
+- `inspect-budget` mostra orçamento diário já consumido por provider
+
+### 3. Inspecionar antes de executar
+
+```bash
+bash scripts/task.sh inspect-task review-file '{"query":"paper","objective":"Revisar entrypoint paper"}'
+bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objective":"Explicar arquivo"}'
+```
+
+- `inspect-task` é o entrypoint principal para entender rota, arquivos selecionados, prompt e disponibilidade de providers
+- `assemble-context` é o entrypoint principal para conferir o contexto bruto montado pelo orchestrator
+
+### 4. Executar pelo fluxo central
+
+```bash
+python3 -m app.cli.task_cli review-file '{"query":"paper","objective":"Revisar entrypoint paper"}'
+```
+
+- esse é o caminho recomendado quando quiser efetivamente passar pelo roteador, orçamento, retry, fallback e persistência operacional
+
+### 5. Usar aliases legados só quando fizer sentido
+
+```bash
+bash scripts/task.sh explain-file README.md
+bash scripts/task.sh review-file README.md
+bash scripts/task.sh pick-python-file paper
+```
+
+- esses comandos continuam funcionando, mas hoje são principalmente atalhos para `inspect-task` ou `assemble-context`
+
+### 6. Usar comandos estruturais dedicados
+
+```bash
+bash scripts/task.sh summarize-repo-area README.md AGENTS.md
+bash scripts/task.sh map-dependencies paper_trade.py
+```
+
+- `summarize-repo-area` agora usa o planner genérico para montar contexto multi-arquivo
+- `map-dependencies` ainda é útil para parsing de imports locais e externos
 
 ## Estrutura do repositório
 

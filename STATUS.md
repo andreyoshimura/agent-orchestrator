@@ -24,6 +24,7 @@
 - reduzir seleção manual de contexto
 - aumentar autonomia do fluxo local
 - evoluir o core sem acoplar o orchestrator ao profile `ia-trade`
+- consolidar aliases legados sobre `inspect-task` / `assemble-context`
 
 ## Checkpoint de retomada
 
@@ -42,8 +43,7 @@
   - suporte a `AI_PROJECTS_ROOT` para validar múltiplos profiles
   - testes cobrindo profile alternativo além de `ia-trade`
 - o próximo passo recomendado ao retomar é:
-  - cobrir comandos CLI (`inspect-project`, `inspect-task`, `diagnose-orchestrator`) em cenários reais com profile alternativo
-  - reduzir wrappers legados já substituíveis por inspeção genérica
+  - ampliar cenários de erro também nos entrypoints CLI e no carregamento de payload inválido
   - depois ampliar confiabilidade operacional do fluxo completo
 
 ## Encerramento do dia
@@ -54,9 +54,15 @@
   - diagnósticos operacionais
   - `inspect-task`
   - suporte/testes para múltiplos profiles via `AI_PROJECTS_ROOT`
+  - cobertura dos comandos CLI com profile alternativo
+  - consolidação de aliases legados (`explain-file`, `review-file`) sobre o fluxo genérico
+  - consolidação de alias legado (`summarize-repo-area`) sobre o fluxo genérico
+  - consolidação de aliases legados (`pick-python-file`, `explain-best-python-match`, `review-best-python-match`) sobre o fluxo genérico
+  - documentação do workflow recomendado de uso local
+  - decisão de manter `map-dependencies` como ferramenta estrutural dedicada
 - ponto exato para retomar amanhã:
-  - iniciar pela cobertura dos comandos CLI usando profile alternativo e repo configurado
-  - depois revisar quais wrappers ainda podem ser removidos sem perder usabilidade local
+  - ampliar cenários de erro também nos entrypoints CLI e no carregamento de payload inválido
+  - depois revisar se vale criar um task-type genérico de análise estrutural para reduzir a excepcionalidade de `map-dependencies`
 
 ## Arquivos-chave para retomar rápido
 

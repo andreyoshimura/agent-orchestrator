@@ -69,8 +69,7 @@
 
 - checkpoint atual: fim da `Fase 4` e avanço inicial da `Fase 5`
 - próximo bloco a implementar:
-  - cobrir comandos CLI com testes em cenário de profile alternativo
-  - redução adicional de wrappers manuais
+  - redução adicional de wrappers manuais ainda restantes
   - ampliar confiabilidade operacional do fluxo completo
 
 ## Fase 2 - Montagem automática de contexto
@@ -94,6 +93,10 @@
 - `[~]` persistir cache de contexto e resultados reutilizáveis
 - `[~]` criar comandos de diagnóstico do estado global do orchestrator
 - `[~]` reduzir dependência de wrappers manuais para tarefas recorrentes
+  - aliases legados de arquivo explícito agora delegam para `inspect-task` / `assemble-context`
+  - aliases legados de seleção Python agora delegam para `inspect-task` / `assemble-context`
+  - `summarize-repo-area` agora delega para `assemble-context summarize-module`
+  - `map-dependencies` permanece dedicado por ainda fazer parsing estrutural via AST
 
 ## Fase 5 - Confiabilidade
 
@@ -101,7 +104,7 @@
 - `[ ]` cobrir cenários sem `AI_TARGET_REPO` e sem profile válido
 - `[ ]` validar comportamento com múltiplos profiles além de `ia-trade`
 - `[x]` validar comportamento com múltiplos profiles além de `ia-trade`
-- `[ ]` documentar workflow recomendado de uso local
+- `[x]` documentar workflow recomendado de uso local
 
 ## Evidências do que foi baixado
 

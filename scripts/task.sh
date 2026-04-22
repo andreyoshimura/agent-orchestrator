@@ -5,6 +5,29 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+
+run_module() {
+  "${PYTHON_BIN}" -m "$@"
+}
+
+json_payload() {
+  local query="${1:-}"
+  local objective="${2:-}"
+  "${PYTHON_BIN}" -c 'import json, sys; print(json.dumps({"query": sys.argv[1], "objective": sys.argv[2]}))' "${query}" "${objective}"
+}
+
+json_file_payload() {
+  local file="${1:-}"
+  local objective="${2:-}"
+  "${PYTHON_BIN}" -c 'import json, sys; print(json.dumps({"file": sys.argv[1], "objective": sys.argv[2]}))' "${file}" "${objective}"
+}
+
+json_files_payload() {
+  local objective="${1:-}"
+  shift || true
+  "${PYTHON_BIN}" -c 'import json, sys; print(json.dumps({"files": sys.argv[2:], "objective": sys.argv[1]}))' "${objective}" "$@"
+}
 
 # Primeiro argumento = tipo de tarefa.
 TASK_TYPE="${1:-}"
@@ -17,51 +40,57 @@ fi
 
 case "${TASK_TYPE}" in
   explain-file)
-    # Lê um arquivo do repo alvo e devolve preview estruturado.
+    # Alias legado: monta contexto genérico para um arquivo explícito.
     TARGET_FILE="${1:-README.md}"
-    python3 -m app.commands.explain_file "${TARGET_FILE}"
+    PAYLOAD="$(json_file_payload "${TARGET_FILE}" "Explain the selected file with minimal context.")"
+    run_module app.commands.assemble_context explain-file "${PAYLOAD}"
     ;;
   review-file)
-    # Faz uma revisão estrutural simples do arquivo alvo.
+    # Alias legado: usa inspeção genérica do plano local para um arquivo explícito.
     TARGET_FILE="${1:-README.md}"
-    python3 -m app.commands.review_file "${TARGET_FILE}"
+    PAYLOAD="$(json_file_payload "${TARGET_FILE}" "Review the selected file with minimal context.")"
+    run_module app.commands.inspect_task review-file "${PAYLOAD}"
     ;;
   summarize-repo-area)
-    # Resume múltiplos arquivos. Sem args, usa defaults do comando.
+    # Alias legado: monta contexto genérico para sumarização de múltiplos arquivos.
     if [[ "$#" -eq 0 ]]; then
-      python3 -m app.commands.summarize_repo_area
+      PAYLOAD="$(json_files_payload "Summarize the selected repository area." "README.md" "AGENTS.md")"
     else
-      python3 -m app.commands.summarize_repo_area "$@"
+      PAYLOAD="$(json_files_payload "Summarize the selected repository area." "$@")"
     fi
+    run_module app.commands.assemble_context summarize-module "${PAYLOAD}"
     ;;
   map-dependencies)
-    # Extrai imports locais e externos de um arquivo Python.
+    # Ferramenta estrutural dedicada: extrai imports locais e externos via AST.
     TARGET_FILE="${1:-paper_trade.py}"
-    python3 -m app.commands.map_dependencies "${TARGET_FILE}"
+    run_module app.commands.map_dependencies "${TARGET_FILE}"
     ;;
   list-python-files)
     # Lista arquivos Python válidos do repo alvo.
-    python3 -m app.commands.list_python_files
+    run_module app.commands.list_python_files
     ;;
   pick-python-file)
-    # Procura arquivos Python por nome parcial.
+    # Alias legado: usa o fluxo genérico para inspecionar a seleção automática.
     QUERY="${1:-paper}"
-    python3 -m app.commands.pick_python_file "${QUERY}"
+    PAYLOAD="$(json_payload "${QUERY}" "Inspect the best Python file candidates for this query.")"
+    run_module app.commands.inspect_task review-file "${PAYLOAD}"
     ;;
   review-best-python-match)
-    # Procura o melhor candidato por nome parcial e já faz review.
+    # Alias legado: usa a inspeção genérica do plano local para revisar o melhor match.
     QUERY="${1:-paper}"
-    python3 -m app.commands.review_best_python_match "${QUERY}"
+    PAYLOAD="$(json_payload "${QUERY}" "Review the best Python file match for this query.")"
+    run_module app.commands.inspect_task review-file "${PAYLOAD}"
     ;;
   explain-best-python-match)
-    # Procura o melhor candidato por nome parcial e já faz preview estrutural.
+    # Alias legado: monta contexto genérico do melhor match em vez de usar wrapper dedicado.
     QUERY="${1:-paper}"
-    python3 -m app.commands.explain_best_python_match "${QUERY}"
+    PAYLOAD="$(json_payload "${QUERY}" "Explain the best Python file match for this query.")"
+    run_module app.commands.assemble_context explain-file "${PAYLOAD}"
     ;;
   inspect-project)
     # Inspeciona o profile atual e o repo alvo configurado.
     PROJECT_ID="${1:-${AI_DEFAULT_PROJECT:-ia-trade}}"
-    python3 -m app.commands.inspect_project "${PROJECT_ID}"
+    run_module app.commands.inspect_project "${PROJECT_ID}"
     ;;
   assemble-context)
     # Monta contexto reutilizável para uma tarefa usando bootstrap, memórias e arquivos alvo.
@@ -72,7 +101,7 @@ case "${TASK_TYPE}" in
     else
       PAYLOAD="$*"
     fi
-    python3 -m app.commands.assemble_context "${INNER_TASK_TYPE}" "${PAYLOAD}"
+    run_module app.commands.assemble_context "${INNER_TASK_TYPE}" "${PAYLOAD}"
     ;;
   inspect-task)
     # Inspeciona rota, contexto, plano local e disponibilidade de providers para qualquer tarefa.
@@ -83,15 +112,15 @@ case "${TASK_TYPE}" in
     else
       PAYLOAD="$*"
     fi
-    python3 -m app.commands.inspect_task "${INNER_TASK_TYPE}" "${PAYLOAD}"
+    run_module app.commands.inspect_task "${INNER_TASK_TYPE}" "${PAYLOAD}"
     ;;
   inspect-budget)
     # Mostra o orçamento diário acumulado e restante por provider.
-    python3 -m app.commands.inspect_budget
+    run_module app.commands.inspect_budget
     ;;
   diagnose-orchestrator)
     # Mostra estado global do orchestrator, budget e persistência local.
-    python3 -m app.commands.diagnose_orchestrator
+    run_module app.commands.diagnose_orchestrator
     ;;
   *)
     # Fallback para o roteador genérico.
@@ -100,6 +129,6 @@ case "${TASK_TYPE}" in
     else
       PAYLOAD="$*"
     fi
-    python3 -m app.cli.task_cli "${TASK_TYPE}" "${PAYLOAD}"
+    run_module app.cli.task_cli "${TASK_TYPE}" "${PAYLOAD}"
     ;;
 esac
