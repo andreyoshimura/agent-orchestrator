@@ -28,7 +28,6 @@
 - aumentar autonomia do fluxo local
 - evoluir o core sem acoplar o orchestrator ao profile `ia-trade`
 - consolidar aliases legados sobre `inspect-task` / `assemble-context`
-- endurecer respostas de erro dos entrypoints genéricos para payload JSON inválido, profile inválido e target repo ausente
 - ampliar cobertura de testes para ranking e montagem de contexto no core
 - ampliar cobertura de confiabilidade para `TaskRunner` e persistência operacional
 - evitar consumo indevido de budget quando provider não executa de fato

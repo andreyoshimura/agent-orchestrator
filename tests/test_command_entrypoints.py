@@ -192,6 +192,16 @@ class CommandEntrypointsTest(unittest.TestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["reason"], "invalid json payload: Expecting value")
 
+    def test_inspect_task_returns_structured_error_for_non_object_payload(self) -> None:
+        payload, exit_code = _invoke_command(
+            inspect_task.main,
+            ["inspect_task.py", "review-file", '["engine.py"]'],
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["reason"], "json payload must be an object")
+
     def test_assemble_context_returns_structured_error_for_non_object_payload(self) -> None:
         payload, exit_code = _invoke_command(
             assemble_context.main,
@@ -211,6 +221,16 @@ class CommandEntrypointsTest(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["reason"], "invalid json payload: Expecting value")
+
+    def test_task_cli_returns_structured_error_for_non_object_payload(self) -> None:
+        payload, exit_code = _invoke_command(
+            task_cli.main,
+            ["task_cli.py", "review-file", '["engine.py"]'],
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["reason"], "json payload must be an object")
 
     def test_inspect_task_returns_structured_error_for_missing_profile(self) -> None:
         with _patched_env({
