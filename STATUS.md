@@ -25,6 +25,19 @@
 - aumentar autonomia do fluxo local
 - evoluir o core sem acoplar o orchestrator ao profile `ia-trade`
 - consolidar aliases legados sobre `inspect-task` / `assemble-context`
+- endurecer respostas de erro dos entrypoints genéricos para payload JSON inválido, profile inválido e target repo ausente
+- ampliar cobertura de testes para ranking e montagem de contexto no core
+- ampliar cobertura de confiabilidade para `TaskRunner` e persistência operacional
+- evitar consumo indevido de budget quando provider não executa de fato
+- reduzir a excepcionalidade de `map-dependencies` no fluxo local
+- ampliar parsing estrutural de `map-dependencies` para símbolos e chamadas
+- incluir resolução cross-file básica de imports locais no `dependency_map`
+- incluir `call_relations` no `dependency_map` para relacionar chamadas e imports locais resolvidos
+- incluir `target_symbols` por import local resolvido para enriquecer contexto semântico
+- priorizar `call_relations` com score/rank para leitura operacional
+- adicionar `call_relation_summary` para leitura executiva de risco estrutural
+- sinalizar `risk_flags` para relações não resolvidas de maior impacto
+- incluir `dependency_highlights` para leitura rápida em entrypoints genéricos
 
 ## Checkpoint de retomada
 
@@ -43,8 +56,9 @@
   - suporte a `AI_PROJECTS_ROOT` para validar múltiplos profiles
   - testes cobrindo profile alternativo além de `ia-trade`
 - o próximo passo recomendado ao retomar é:
-  - ampliar cenários de erro também nos entrypoints CLI e no carregamento de payload inválido
-  - depois ampliar confiabilidade operacional do fluxo completo
+  - consolidar cenários restantes de confiabilidade no core (principalmente fluxos de comparação estrutural)
+  - manter cobertura explícita para profile inválido, payload inválido e execução com target repo não configurado
+  - depois revisar se vale expandir análise estrutural para relações semânticas entre arquivos (ex.: uso de classes/funções exportadas)
 
 ## Encerramento do dia
 
@@ -61,7 +75,8 @@
   - documentação do workflow recomendado de uso local
   - decisão de manter `map-dependencies` como ferramenta estrutural dedicada
 - ponto exato para retomar amanhã:
-  - ampliar cenários de erro também nos entrypoints CLI e no carregamento de payload inválido
+  - ampliar cenários de erro também nos entrypoints CLI além do payload inválido já coberto
+  - manter cobertura explícita para profile inválido e para execução com target repo não configurado
   - depois revisar se vale criar um task-type genérico de análise estrutural para reduzir a excepcionalidade de `map-dependencies`
 
 ## Arquivos-chave para retomar rápido

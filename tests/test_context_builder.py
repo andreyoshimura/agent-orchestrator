@@ -112,6 +112,53 @@ class ContextBuilderTest(unittest.TestCase):
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO_ALT", old_target)
 
+    def test_build_deduplicates_explicit_files_and_respects_max_target_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / "a.py").write_text("print('a')\n", encoding="utf-8")
+            (Path(tmpdir) / "b.py").write_text("print('b')\n", encoding="utf-8")
+            (Path(tmpdir) / "c.py").write_text("print('c')\n", encoding="utf-8")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                bundle = ContextBuilder(load_runtime_project(), max_target_files=2).build(
+                    task_type="review-file",
+                    payload={"files": ["a.py", "a.py", "b.py", "c.py"]},
+                )
+
+                self.assertEqual(bundle.files, ["a.py", "b.py"])
+                self.assertIn("TARGET_FILE::a.py", bundle.sections)
+                self.assertIn("TARGET_FILE::b.py", bundle.sections)
+                self.assertNotIn("TARGET_FILE::c.py", bundle.sections)
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_build_skips_missing_explicit_files_without_failing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / "present.py").write_text("print('ok')\n", encoding="utf-8")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                bundle = ContextBuilder(load_runtime_project()).build(
+                    task_type="review-file",
+                    payload={"files": ["missing.py", "present.py"]},
+                )
+
+                self.assertEqual(bundle.files, ["missing.py", "present.py"])
+                self.assertNotIn("TARGET_FILE::missing.py", bundle.sections)
+                self.assertIn("TARGET_FILE::present.py", bundle.sections)
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
 
 def _restore_env(name: str, value: str | None) -> None:
     if value is None:

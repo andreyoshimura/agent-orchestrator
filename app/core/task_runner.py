@@ -287,7 +287,6 @@ class TaskRunner:
         current_result: Dict[str, object] | None = None
 
         for attempt_index in range(max_provider_retries + 1):
-            self.budget_manager.record(provider_name, estimated_cost)
             current_result = self._execute_provider(
                 provider_name=provider_name,
                 request=request,
@@ -295,6 +294,8 @@ class TaskRunner:
                 context_info=context_info,
             )
             failure_type = classify_provider_failure(current_result["status"], current_result.get("output"))
+            if self._should_record_cost(current_result["status"], current_result.get("output"), estimated_cost):
+                self.budget_manager.record(provider_name, estimated_cost)
             attempts.append({
                 "provider": provider_name,
                 "attempt": attempt_index + 1,
@@ -314,6 +315,12 @@ class TaskRunner:
 
         assert current_result is not None
         return current_result, attempts, False
+
+    def _should_record_cost(self, status: object, output: Dict[str, object] | None, estimated_cost: float) -> bool:
+        if estimated_cost <= 0:
+            return False
+        failure_type = classify_provider_failure(status, output)
+        return failure_type not in {"provider_unavailable", "configuration"}
 
     def _persist_result(self, request: TaskRequest, result: TaskResult) -> None:
         project_id = str(request.payload.get("project_id", "unknown"))

@@ -71,6 +71,9 @@
 - próximo bloco a implementar:
   - redução adicional de wrappers manuais ainda restantes
   - ampliar confiabilidade operacional do fluxo completo
+  - payload JSON inválido agora retorna erro estruturado nos entrypoints genéricos
+  - profile inválido agora retorna erro estruturado nos entrypoints genéricos
+  - execução com target repo não configurado agora está coberta nos testes de entrypoint
 
 ## Fase 2 - Montagem automática de contexto
 
@@ -96,15 +99,43 @@
   - aliases legados de arquivo explícito agora delegam para `inspect-task` / `assemble-context`
   - aliases legados de seleção Python agora delegam para `inspect-task` / `assemble-context`
   - `summarize-repo-area` agora delega para `assemble-context summarize-module`
-  - `map-dependencies` permanece dedicado por ainda fazer parsing estrutural via AST
+  - `map-dependencies` permanece dedicado para parsing estrutural via AST, mas agora compartilha runtime/profile e inspeção estrutural com entrypoints genéricos
 
 ## Fase 5 - Confiabilidade
 
-- `[ ]` ampliar testes para comandos, ranking e montagem de contexto
-- `[ ]` cobrir cenários sem `AI_TARGET_REPO` e sem profile válido
+- `[~]` ampliar testes para comandos, ranking e montagem de contexto
+- `[x]` cobrir cenários sem `AI_TARGET_REPO` e sem profile válido nos entrypoints genéricos
+- `[~]` cobrir payload JSON inválido e payload não-objeto nos entrypoints genéricos
 - `[ ]` validar comportamento com múltiplos profiles além de `ia-trade`
 - `[x]` validar comportamento com múltiplos profiles além de `ia-trade`
 - `[x]` documentar workflow recomendado de uso local
+
+### Avanços recentes de confiabilidade
+
+- cobertura ampliada para ranking:
+  - inferência de queries com deduplicação e prioridade da query explícita
+  - comportamento quando objetivo só contém tokens curtos (sem seleção indevida)
+- cobertura ampliada para montagem de contexto:
+  - deduplicação de `files` explícitos respeitando `max_target_files`
+  - tolerância a arquivos explícitos inexistentes sem falha do fluxo
+- cobertura ampliada para `TaskRunner` e persistência operacional:
+  - execução degradada quando profile não existe (`project profile not found`)
+  - contexto parcial quando não há arquivos selecionados no repo configurado
+  - persistência resiliente para saída degradada sem `provider_result`
+  - chave de cache determinística para payloads com ordem diferente de campos
+  - consumo de budget não é mais registrado quando provider está indisponível/configuração inválida
+- redução de excepcionalidade de `map-dependencies`:
+  - parser estrutural extraído para `app/core/dependency_mapper.py`
+  - `inspect-task map-dependencies` e `assemble-context map-dependencies` retornam `dependency_map`
+  - comando legado `map-dependencies` agora usa `load_runtime_project` e funciona com profiles alternativos
+  - `dependency_map` agora inclui também símbolos (`functions/classes/methods`) e chamadas locais/por atributo
+  - `dependency_map` agora também resolve imports locais para caminhos candidatos (grafo cross-file básico)
+  - `dependency_map` agora inclui `call_relations` para ligar chamadas detectadas aos imports locais resolvidos
+  - imports locais resolvidos agora incluem `target_symbols` (funções/classes exportadas do arquivo alvo)
+  - `call_relations` agora saem priorizadas com `relation_score`, `relation_priority` e `relation_rank`
+  - `call_relation_summary` adiciona leitura executiva por prioridade e top relação detectada
+  - `call_relation_summary` agora inclui `risk_flags` para sinalizar relações não resolvidas com maior criticidade
+  - `inspect-task` e `assemble-context` agora incluem `dependency_highlights` para consumo operacional rápido
 
 ## Evidências do que foi baixado
 

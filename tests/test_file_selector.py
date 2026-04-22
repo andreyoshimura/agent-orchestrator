@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.core.file_selector import auto_select_python_files, choose_best_python_match, collect_python_files
+from app.core.file_selector import auto_select_python_files, choose_best_python_match, collect_python_files, infer_queries
 
 
 class FileSelectorTest(unittest.TestCase):
@@ -106,6 +106,35 @@ class FileSelectorTest(unittest.TestCase):
             files = collect_python_files(root)
 
             self.assertEqual(files, ["app.py"])
+
+    def test_infer_queries_prioritizes_explicit_query_and_keeps_unique_tokens(self) -> None:
+        queries = infer_queries(
+            task_type="review-file",
+            objective="Revisar engine runtime e engine risk manager runtime",
+            query="engine",
+        )
+
+        self.assertEqual(queries[0], "engine")
+        self.assertIn("runtime", queries)
+        self.assertIn("risk", queries)
+        self.assertEqual(queries.count("engine"), 1)
+
+    def test_auto_select_python_files_ignores_short_objective_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "run.py").write_text("print('run')\n", encoding="utf-8")
+            (root / "engine.py").write_text("print('engine')\n", encoding="utf-8")
+
+            ranked = auto_select_python_files(
+                root=root,
+                task_type="review-file",
+                objective="rev run api ui",
+                query="",
+                limit=3,
+            )
+
+            # No useful tokens are inferred, so no file should be selected.
+            self.assertEqual([item.file for item in ranked], [])
 
 
 if __name__ == "__main__":

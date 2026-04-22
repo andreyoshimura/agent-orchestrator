@@ -500,7 +500,8 @@ class TaskRunnerTest(unittest.TestCase):
                     TaskRequest(
                         task_type="review-file",
                         payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
-                    )
+                    ),
+                    estimated_cost=0.2,
                 )
 
                 self.assertEqual(result.provider, "openai")
@@ -510,6 +511,7 @@ class TaskRunnerTest(unittest.TestCase):
                     [{"provider": "openai", "attempt": 1, "status": "error", "failure_type": "configuration"}],
                 )
                 self.assertEqual(result.output["provider_result"]["output"]["failure_type"], "configuration")
+                self.assertEqual(runner.budget_manager.status("openai").spent, 0.0)
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)
@@ -547,6 +549,70 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(result.output["provider_attempts"][0]["failure_type"], "provider_unavailable")
                 self.assertEqual(result.output["provider_attempts"][1]["provider"], "claude")
                 self.assertEqual(result.output["provider_attempts"][1]["failure_type"], "success")
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_run_degrades_when_project_profile_is_missing(self) -> None:
+        old_project = os.environ.get("AI_DEFAULT_PROJECT")
+        try:
+            os.environ["AI_DEFAULT_PROJECT"] = "missing-project"
+
+            budget_manager = BudgetManager({"claude": 1.0})
+            runner = TaskRunner(
+                router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+                budget_manager=budget_manager,
+                provider_settings={
+                    "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                },
+            )
+            result = runner.run(
+                TaskRequest(
+                    task_type="review-file",
+                    payload={"project_id": "missing-project", "query": "paper"},
+                ),
+                estimated_cost=0.2,
+            )
+
+            self.assertEqual(result.status, "degraded")
+            self.assertEqual(result.output["context"]["status"], "unavailable")
+            self.assertEqual(result.output["local_plan"]["status"], "unavailable")
+            self.assertEqual(
+                result.output["provider_attempts"],
+                [{"provider": "claude", "attempt": 1, "status": "skipped", "failure_type": "provider_unavailable"}],
+            )
+            self.assertEqual(budget_manager.status("claude").spent, 0.0)
+        finally:
+            _restore_env("AI_DEFAULT_PROJECT", old_project)
+
+    def test_run_marks_context_partial_when_no_target_files_are_selected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / "unrelated.py").write_text("print('x')\n", encoding="utf-8")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+                    budget_manager=BudgetManager({"claude": 1.0}),
+                    provider_settings={
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                )
+                result = runner.run(
+                    TaskRequest(
+                        task_type="review-file",
+                        payload={"project_id": "ia-trade", "query": "nonexistent-query-token"},
+                    )
+                )
+
+                self.assertEqual(result.status, "stub")
+                self.assertEqual(result.output["context"]["status"], "partial")
+                self.assertEqual(result.output["context"]["reason"], "no target files selected")
+                self.assertEqual(result.output["local_plan"]["selected_files"], [])
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)

@@ -68,7 +68,7 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 
 ## Comandos ainda dedicados
 
-- `bash scripts/task.sh map-dependencies <file.py>` continua como comando dedicado porque faz parsing estrutural de imports, não apenas seleção de contexto
+- `bash scripts/task.sh map-dependencies <file.py>` continua como comando dedicado para parsing estrutural via AST, mas agora usa o mesmo carregamento de profile/runtime do fluxo genérico
 
 ## Recomendações de uso
 
@@ -111,6 +111,9 @@ bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objecti
 
 - `inspect-task` é o entrypoint principal para entender rota, arquivos selecionados, prompt e disponibilidade de providers
 - `assemble-context` é o entrypoint principal para conferir o contexto bruto montado pelo orchestrator
+- para `map-dependencies`, ambos também retornam `dependency_map` quando houver arquivo Python selecionado
+  - `dependency_map` inclui imports, símbolos, chamadas, `call_relations` priorizadas (`relation_score`/`relation_priority`/`relation_rank`), resumo executivo (`call_relation_summary`) com `risk_flags`, e resolução básica de imports locais para arquivos candidatos no repo
+  - `inspect-task` e `assemble-context` também retornam `dependency_highlights` para leitura rápida operacional
 
 ### 4. Executar pelo fluxo central
 
@@ -138,7 +141,7 @@ bash scripts/task.sh map-dependencies paper_trade.py
 ```
 
 - `summarize-repo-area` agora usa o planner genérico para montar contexto multi-arquivo
-- `map-dependencies` ainda é útil para parsing de imports locais e externos
+- `map-dependencies` ainda é útil para parsing estrutural (imports, símbolos e chamadas), com suporte a profiles alternativos via `AI_PROJECTS_ROOT`
 
 ## Estrutura do repositório
 

@@ -39,6 +39,74 @@ class OperationalStoreTest(unittest.TestCase):
             self.assertEqual(state_payload["selected_files"], ["paper_trade.py"])
             self.assertEqual(cache_payload["summary"]["provider"], "gemini")
 
+    def test_persist_task_result_handles_degraded_output_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            refs = store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+                output={
+                    "provider_attempts": [{"provider": "claude", "attempt": 1, "status": "skipped", "failure_type": "provider_unavailable"}],
+                },
+            )
+
+            state_payload = state_store.load(refs["state_key"])
+            cache_payload = json.loads(cache_store.get(refs["cache_key"]))
+
+            self.assertEqual(state_payload["provider"], None)
+            self.assertEqual(state_payload["status"], None)
+            self.assertEqual(state_payload["selected_files"], [])
+            self.assertEqual(cache_payload["summary"]["provider"], None)
+            self.assertEqual(cache_payload["summary"]["status"], None)
+            self.assertEqual(cache_payload["summary"]["selected_files"], [])
+
+    def test_persist_task_result_reuses_state_key_and_fingerprints_cache_by_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            refs_a = store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+                output={"provider_result": {"provider": "gemini", "status": "stub"}},
+            )
+            refs_b = store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "risk"},
+                output={"provider_result": {"provider": "claude", "status": "stub"}},
+            )
+
+            self.assertEqual(refs_a["state_key"], refs_b["state_key"])
+            self.assertNotEqual(refs_a["cache_key"], refs_b["cache_key"])
+
+    def test_cache_fingerprint_is_stable_for_payload_key_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            refs_a = store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper", "objective": "x"},
+                output={"provider_result": {"provider": "gemini", "status": "stub"}},
+            )
+            refs_b = store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"objective": "x", "query": "paper"},
+                output={"provider_result": {"provider": "gemini", "status": "stub"}},
+            )
+
+            self.assertEqual(refs_a["cache_key"], refs_b["cache_key"])
+
 
 if __name__ == "__main__":
     unittest.main()

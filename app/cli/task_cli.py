@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 import yaml
 
+from app.cli.payload_parser import parse_json_payload
 from app.core.budget_manager import BudgetManager
 from app.core.project_loader import load_runtime_project
 from app.core.router import Router
@@ -57,14 +58,18 @@ def main() -> int:
     task_type = sys.argv[1]
 
     raw_payload = " ".join(sys.argv[2:]).strip()
-    if not raw_payload:
-        payload = {}
-    else:
-        payload = json.loads(raw_payload)
+    payload, payload_error = parse_json_payload(raw_payload)
+    if payload_error:
+        print(json.dumps({"status": "error", "reason": payload_error}, ensure_ascii=False, indent=2))
+        return 1
 
     routing_config = _load_yaml("config/routing.yaml").get("routing", {})
     budgets_config = _load_yaml("config/budgets.yaml")
-    runtime_project = load_runtime_project()
+    try:
+        runtime_project = load_runtime_project()
+    except FileNotFoundError as exc:
+        print(json.dumps({"status": "error", "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 1
     project_id = runtime_project.project_id
 
     daily_limits = _resolve_daily_limits(budgets_config)
