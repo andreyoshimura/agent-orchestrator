@@ -34,7 +34,17 @@ class BaseProvider(ABC):
                     "failure_type": "provider_unavailable",
                 },
             )
-        return self._run(request)
+        try:
+            return self._run(request)
+        except Exception as exc:  # pragma: no cover - defensive boundary for runtime reliability
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "reason": f"provider_internal_error:{exc.__class__.__name__}",
+                    "failure_type": "temporary",
+                },
+            )
 
     @abstractmethod
     def _run(self, request: ProviderRequest) -> ProviderResponse:

@@ -139,6 +139,8 @@
   - `openai`, `gemini` e `claude` agora suportam execução live via HTTP quando `model` e `api_key` estão configurados
   - classificação de erro HTTP por tipo (`rate_limit`, `authorization`, `invalid_request`, `temporary`)
   - `*_API_BASE` opcional para override de endpoint por provider
+  - respostas inválidas de provider (JSON malformado/shape inesperado) agora retornam erro estruturado sem interromper o pipeline
+  - exceções internas de provider agora são isoladas em `BaseProvider.run` com falha classificada como temporária
 
 ## Evidências do que foi baixado
 

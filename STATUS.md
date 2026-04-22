@@ -20,6 +20,7 @@
 - a suíte já valida um segundo profile além de `ia-trade` usando raiz temporária
 - `openai`, `gemini` e `claude` agora suportam execução live quando configurados (`model` + `api_key`)
 - cada provider agora aceita override opcional de endpoint via `*_API_BASE`
+- o runtime de providers agora isola exceções internas e respostas JSON inválidas para evitar quebra do pipeline
 
 ## Próximo foco
 

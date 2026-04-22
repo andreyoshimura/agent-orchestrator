@@ -4,7 +4,7 @@ from urllib.error import HTTPError
 from unittest.mock import MagicMock, patch
 
 from app.providers import get_provider
-from app.providers.base import ProviderRequest
+from app.providers.base import BaseProvider, ProviderRequest
 from app.providers.config import ProviderSettings
 
 
@@ -131,6 +131,54 @@ class ProviderTest(unittest.TestCase):
 
         self.assertEqual(response.status, "error")
         self.assertEqual(response.output["failure_type"], "authorization")
+
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_handles_invalid_json_response(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b"{invalid"
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertIn("invalid_response_json", response.output["reason"])
+
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_handles_invalid_json_response(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b"[1,2,3]"
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:top_level_not_object")
+
+    def test_base_provider_run_handles_internal_exception(self) -> None:
+        class BrokenProvider(BaseProvider):
+            name = "broken"
+
+            def _run(self, request: ProviderRequest):  # type: ignore[override]
+                raise RuntimeError("boom")
+
+        provider = BrokenProvider(
+            ProviderSettings(name="broken", enabled=True, model="n/a", api_key="n/a", api_base="")
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertIn("provider_internal_error", response.output["reason"])
 
 
 if __name__ == "__main__":

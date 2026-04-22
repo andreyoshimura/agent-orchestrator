@@ -72,7 +72,32 @@ class OpenAIProvider(BaseProvider):
                 },
             )
 
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": f"invalid_response_json:{exc.msg}",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
+        if not isinstance(data, dict):
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:top_level_not_object",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
         return ProviderResponse(
             provider=self.name,
             status="completed",
