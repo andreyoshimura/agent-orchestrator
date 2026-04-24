@@ -107,6 +107,7 @@ bash scripts/task.sh inspect-budget
 
 - `inspect-project` valida profile, arquivos do projeto e repo alvo
 - `diagnose-orchestrator` mostra estado de projeto, storage e execuções recentes
+- `diagnose-orchestrator` também mostra métricas de índice de cache e chaves recentes de cache de `inspect-task`
 - `inspect-budget` mostra orçamento diário já consumido por provider
 
 ### 3. Inspecionar antes de executar

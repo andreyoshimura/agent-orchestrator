@@ -105,6 +105,8 @@
   - `task_cli` já pode reutilizar cache por padrão (`AI_CACHE_REUSE_ENABLED`, com `force_refresh` no payload para bypass)
   - fingerprint agora incorpora assinatura de conteúdo dos arquivos selecionados para invalidação automática
 - `[~]` criar comandos de diagnóstico do estado global do orchestrator
+- `[~]` criar comandos de diagnóstico do estado global do orchestrator
+  - `diagnose-orchestrator` agora inclui métricas de índice de cache e chaves recentes de cache `inspect`
 - `[~]` reduzir recomputação de inspeção local
   - `inspect-task` agora suporta cache com TTL por payload e bypass via `force_refresh`
   - cache de inspeção agora invalida automaticamente quando arquivos selecionados mudam

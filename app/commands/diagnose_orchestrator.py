@@ -64,6 +64,12 @@ def main() -> int:
             "state_key_count": len(state_store.list_keys()),
             "cache_dir": str(cache_store.base_dir),
             "cache_entry_count": cache_store.count(),
+            "cache_indexed_entry_count": len(cache_store.list_entries(limit=1000)),
+            "cache_inspect_entry_count": len(cache_store.list_entries(prefix="inspect:", limit=1000)),
+            "recent_inspect_cache_keys": [
+                item.get("key")
+                for item in cache_store.list_entries(prefix="inspect:", limit=5)
+            ],
             "recent_task_states": _recent_task_states(state_store),
         },
         "config": {

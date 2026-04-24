@@ -292,6 +292,9 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertTrue(payload["project"]["target_repo_exists"])
             self.assertEqual(payload["storage"]["state_key_count"], 1)
             self.assertEqual(payload["storage"]["cache_entry_count"], 1)
+            self.assertEqual(payload["storage"]["cache_indexed_entry_count"], 1)
+            self.assertEqual(payload["storage"]["cache_inspect_entry_count"], 0)
+            self.assertEqual(payload["storage"]["recent_inspect_cache_keys"], [])
             self.assertEqual(
                 payload["storage"]["recent_task_states"][0]["selected_files"],
                 ["engine.py"],

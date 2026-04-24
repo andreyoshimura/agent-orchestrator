@@ -227,6 +227,19 @@ class OperationalStoreTest(unittest.TestCase):
             self.assertIsInstance(final_payload.get("value"), int)
             self.assertEqual(final_payload.get("kind"), "cache")
 
+    def test_cache_store_tracks_key_index_and_supports_prefix_listing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            cache_store.set("inspect:demo:review-file:1", json.dumps({"status": "ok"}))
+            cache_store.set("task:demo:review-file:1", json.dumps({"status": "ok"}))
+
+            all_entries = cache_store.list_entries(limit=10)
+            inspect_entries = cache_store.list_entries(prefix="inspect:", limit=10)
+
+            self.assertGreaterEqual(len(all_entries), 2)
+            self.assertEqual(len(inspect_entries), 1)
+            self.assertTrue(str(inspect_entries[0]["key"]).startswith("inspect:"))
+
 
 if __name__ == "__main__":
     unittest.main()
