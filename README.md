@@ -156,7 +156,9 @@ bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objecti
 - `inspect-task` é o entrypoint principal para entender rota, arquivos selecionados, prompt e disponibilidade de providers
 - `inspect-task` suporta cache de inspeção com TTL para reduzir recomputação em chamadas repetidas; use `"force_refresh": true` no payload para bypass
 - `inspect-task` também expõe `local_agent_output` (saída estruturada do agente local antes da chamada ao provider)
+- `inspect-task` agora também expõe `context_sufficiency`, `local_analysis` e `pipeline` (estágios explícitos do runtime)
 - `task_cli` agora expõe `execution_metrics` na saída (`planning_ms`, `provider_execution_ms`, `total_ms`, tentativas)
+- `task_cli` agora inclui `context_sufficiency`, `local_analysis` e `pipeline.stage_metrics` para diagnóstico de execução por estágio
 - `assemble-context` é o entrypoint principal para conferir o contexto bruto montado pelo orchestrator
 - para `map-dependencies`, ambos também retornam `dependency_map` quando houver arquivo Python selecionado
   - `dependency_map` inclui imports, símbolos, chamadas, `call_relations` priorizadas (`relation_score`/`relation_priority`/`relation_rank`), resumo executivo (`call_relation_summary`) com `risk_flags`, e resolução básica de imports locais para arquivos candidatos no repo

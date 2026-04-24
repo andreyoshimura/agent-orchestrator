@@ -114,11 +114,14 @@
 - `scripts/healthcheck.sh` agora suporta `--meta-flatten` para promover `meta` ao nível raiz com prefixo `meta_`
 - `scripts/healthcheck.sh` agora suporta `--meta-prefix <texto>` para customizar o prefixo usado no flatten
 - `scripts/healthcheck.sh` agora inclui `artifact.path` (e `artifact.latest_link` quando disponível) no payload ao gravar saída em arquivo
+- `TaskRunner` agora expõe pipeline multiestágio explícito em `run`/`inspect` (`pipeline.stage_metrics` + `pipeline.stages`)
+- `TaskRunner` agora expõe `context_sufficiency` estruturado (`context_sufficient`, `selected_files`, `missing_context_risks`, `reason`)
+- `local_agent_output` agora também aparece no estágio explícito `local_analysis` (mantendo compatibilidade com `local_plan`)
   - `TaskRunner` agora publica `execution_metrics` por execução (planejamento, tentativas de provider e tempo total), com persistência no `OperationalStore`
   - `map-dependencies` legado agora usa `TaskRunner.inspect` internamente para consumir `dependency_map` do fluxo genérico
   - timeout de provider por tarefa (`provider_timeout_sec`) agora é lido de `routing.<task>.execution` e aplicado no runtime HTTP dos providers
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
-- suíte atual: `python3 -m unittest -q` com `109` testes (`OK`)
+- suíte atual: `python3 -m unittest -q` com `120` testes (`OK`)
 
 ## Checkpoint final desta sessão
 

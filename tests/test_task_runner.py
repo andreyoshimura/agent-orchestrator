@@ -48,6 +48,10 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(inspection["route"]["provider_timeout_sec"], 30)
                 self.assertEqual(inspection["local_plan"]["selected_files"], ["paper_trade.py"])
                 self.assertEqual(inspection["context"]["status"], "ready")
+                self.assertTrue(inspection["context_sufficiency"]["context_sufficient"])
+                self.assertEqual(inspection["local_analysis"]["status"], "ready")
+                self.assertEqual(inspection["local_analysis"]["local_agent_output"]["agent"], "micro_reviewer")
+                self.assertEqual(inspection["pipeline"]["stages"][0]["stage"], "validate_payload")
                 self.assertEqual(
                     inspection["providers"],
                     [
@@ -119,6 +123,9 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertIn("paper_trade.py", result.output["local_plan"]["prompt_preview"])
                 self.assertEqual(result.output["local_plan"]["local_agent_output"]["agent"], "micro_reviewer")
                 self.assertEqual(result.output["local_plan"]["local_agent_output"]["payload"]["status"], "ready")
+                self.assertEqual(result.output["local_analysis"]["status"], "ready")
+                self.assertEqual(result.output["local_analysis"]["local_agent_output"]["agent"], "micro_reviewer")
+                self.assertTrue(result.output["context_sufficiency"]["context_sufficient"])
                 self.assertEqual(result.output["provider_result"]["provider"], "claude")
                 self.assertEqual(result.output["provider_result"]["status"], "stub")
                 self.assertGreater(result.output["provider_result"]["output"]["prompt_length"], 0)
@@ -134,6 +141,9 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(result.output["execution_metrics"]["cache_hit"], False)
                 self.assertGreaterEqual(result.output["execution_metrics"]["planning_ms"], 0)
                 self.assertGreaterEqual(result.output["execution_metrics"]["total_ms"], 0)
+                self.assertIn("stage_metrics", result.output["execution_metrics"])
+                self.assertIn("pipeline", result.output)
+                self.assertEqual(result.output["pipeline"]["stages"][0]["stage"], "validate_payload")
                 self.assertEqual(result.output["provider_attempts"][0]["provider"], "claude")
                 self.assertEqual(result.output["provider_attempts"][0]["attempt"], 1)
                 self.assertEqual(result.output["provider_attempts"][0]["status"], "stub")
@@ -319,10 +329,32 @@ class TaskRunnerTest(unittest.TestCase):
 
             self.assertEqual(inspection["context"]["status"], "unavailable")
             self.assertEqual(inspection["context"]["reason"], "project profile not found")
+            self.assertFalse(inspection["context_sufficiency"]["context_sufficient"])
             self.assertEqual(inspection["local_plan"]["status"], "unavailable")
+            self.assertEqual(inspection["local_analysis"]["status"], "unavailable")
             self.assertEqual(inspection["providers"][0]["provider"], "claude")
         finally:
             _restore_env("AI_DEFAULT_PROJECT", old_project)
+
+    def test_inspect_returns_structured_output_for_invalid_payload(self) -> None:
+        runner = TaskRunner(
+            router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+            budget_manager=BudgetManager({"claude": 1.0}),
+            provider_settings={
+                "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+            },
+        )
+        inspection = runner.inspect(
+            TaskRequest(
+                task_type="review-file",
+                payload="invalid",  # type: ignore[arg-type]
+            )
+        )
+
+        self.assertEqual(inspection["context"]["status"], "unavailable")
+        self.assertEqual(inspection["context"]["reason"], "payload must be an object")
+        self.assertFalse(inspection["context_sufficiency"]["context_sufficient"])
+        self.assertEqual(inspection["pipeline"]["stages"][0]["status"], "error")
 
     def test_run_uses_alternate_project_root_from_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -741,6 +773,8 @@ class TaskRunnerTest(unittest.TestCase):
             self.assertEqual(result.status, "degraded")
             self.assertEqual(result.output["context"]["status"], "unavailable")
             self.assertEqual(result.output["local_plan"]["status"], "unavailable")
+            self.assertFalse(result.output["context_sufficiency"]["context_sufficient"])
+            self.assertEqual(result.output["local_analysis"]["status"], "unavailable")
             self.assertEqual(
                 result.output["provider_attempts"],
                 [{"provider": "claude", "attempt": 1, "status": "skipped", "failure_type": "provider_unavailable"}],
@@ -776,6 +810,8 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(result.status, "stub")
                 self.assertEqual(result.output["context"]["status"], "partial")
                 self.assertEqual(result.output["context"]["reason"], "no target files selected")
+                self.assertFalse(result.output["context_sufficiency"]["context_sufficient"])
+                self.assertIn("no_target_files_selected", result.output["context_sufficiency"]["missing_context_risks"])
                 self.assertEqual(result.output["local_plan"]["selected_files"], [])
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)

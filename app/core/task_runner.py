@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from app.core.context_builder import ContextBuilder
 from app.core.dependency_mapper import map_python_dependencies, summarize_dependency_map
@@ -53,14 +53,49 @@ class TaskRunner:
         self.allow_cache_reuse = allow_cache_reuse
 
     def run(self, request: TaskRequest, estimated_cost: float = 0.0) -> TaskResult:
+        stage_metrics: dict[str, dict[str, object]] = {}
         run_started_at = time.perf_counter()
+        payload_is_valid = isinstance(request.payload, dict)
+        stage_metrics["validate_payload"] = _stage_metric(
+            status="ok" if payload_is_valid else "error",
+            reason="" if payload_is_valid else "payload must be an object",
+            duration_ms=0,
+        )
+        if not payload_is_valid:
+            return TaskResult(
+                provider="none",
+                task_type=request.task_type,
+                status="degraded",
+                output={
+                    "reason": "invalid payload: payload must be an object",
+                    "pipeline": _pipeline_payload(stage_metrics),
+                    "execution_metrics": _execution_metrics(
+                        planning_ms=0,
+                        run_started_at=run_started_at,
+                        attempt_metrics=[],
+                        cache_hit=False,
+                        stage_metrics=stage_metrics,
+                    ),
+                    "cache": {"hit": False},
+                },
+            )
+
         decision = self.router.decide(request.task_type)
         project_id = str(request.payload.get("project_id", "unknown"))
+        planning_started_at = time.perf_counter()
         planning = self._build_context_info(request)
         planning_ms = _elapsed_ms(run_started_at)
+        stage_metrics["planning"] = _stage_metric(
+            status="ok",
+            reason="",
+            duration_ms=_elapsed_ms(planning_started_at),
+        )
+        stage_metrics.update(planning["stage_metrics"])
         context_info = planning["context"]
+        context_sufficiency = planning["context_sufficiency"]
         local_plan = planning["local_plan"]
         local_plan_object = planning["local_plan_object"]
+        local_analysis = planning["local_analysis"]
         dependency_artifacts = self._dependency_artifacts(request, local_plan, context_info=context_info)
         cache_context = self._build_cache_context(local_plan, context_info)
 
@@ -72,13 +107,35 @@ class TaskRunner:
                 cache_context=cache_context,
             )
             if cached_result:
+                stage_metrics["provider_execution"] = _stage_metric(
+                    status="skipped",
+                    reason="cache hit",
+                    duration_ms=0,
+                )
+                stage_metrics["synthesize_result"] = _stage_metric(
+                    status="ok",
+                    reason="reused cached provider result",
+                    duration_ms=0,
+                )
+                stage_metrics["persistence"] = _stage_metric(
+                    status="skipped",
+                    reason="cache hit",
+                    duration_ms=0,
+                )
+                stage_metrics["return_diagnostics"] = _stage_metric(
+                    status="ok",
+                    reason="",
+                    duration_ms=0,
+                )
                 output = {
                     **cached_result["output"],
+                    "pipeline": _pipeline_payload(stage_metrics),
                     "execution_metrics": {
                         "cache_hit": True,
                         "planning_ms": planning_ms,
                         "provider_execution_ms": 0,
                         "total_ms": _elapsed_ms(run_started_at),
+                        "stage_metrics": stage_metrics,
                     },
                     "cache": {"hit": True, "cache_key": cached_result["cache_key"]},
                 }
@@ -93,6 +150,7 @@ class TaskRunner:
         chosen_provider: Optional[str] = None
         provider_result: Dict[str, object] | None = None
 
+        provider_started_at = time.perf_counter()
         for provider_name in [decision.provider, *decision.fallbacks]:
             if not self._provider_usable(provider_name, estimated_cost):
                 attempted_providers.append({
@@ -122,6 +180,16 @@ class TaskRunner:
                 break
             if not should_continue_to_fallback:
                 break
+        stage_metrics["provider_execution"] = _stage_metric(
+            status="ok" if chosen_provider else "degraded",
+            reason="" if chosen_provider else "no provider completed successfully",
+            duration_ms=_elapsed_ms(provider_started_at),
+        )
+        stage_metrics["synthesize_result"] = _stage_metric(
+            status="ok",
+            reason="",
+            duration_ms=0,
+        )
 
         if not chosen_provider:
             result = TaskResult(
@@ -131,15 +199,19 @@ class TaskRunner:
                 output={
                     "reason": "no provider completed successfully",
                     "context": context_info,
+                    "context_sufficiency": context_sufficiency,
                     "local_plan": local_plan,
+                    "local_analysis": local_analysis,
                     **dependency_artifacts,
                     "provider_attempts": attempted_providers,
                     "provider_result": provider_result,
+                    "pipeline": _pipeline_payload(stage_metrics),
                     "execution_metrics": _execution_metrics(
                         planning_ms=planning_ms,
                         run_started_at=run_started_at,
                         attempt_metrics=attempt_metrics,
                         cache_hit=False,
+                        stage_metrics=stage_metrics,
                     ),
                     "cache": {"hit": False},
                 },
@@ -154,15 +226,19 @@ class TaskRunner:
             output={
                 "payload": request.payload,
                 "context": context_info,
+                "context_sufficiency": context_sufficiency,
                 "local_plan": local_plan,
+                "local_analysis": local_analysis,
                 **dependency_artifacts,
                 "provider_result": provider_result,
                 "provider_attempts": attempted_providers,
+                "pipeline": _pipeline_payload(stage_metrics),
                 "execution_metrics": _execution_metrics(
                     planning_ms=planning_ms,
                     run_started_at=run_started_at,
                     attempt_metrics=attempt_metrics,
                     cache_hit=False,
+                    stage_metrics=stage_metrics,
                 ),
                 "cache": {"hit": False},
             },
@@ -171,8 +247,68 @@ class TaskRunner:
         return result
 
     def inspect(self, request: TaskRequest, estimated_cost: float = 0.0) -> Dict[str, object]:
+        stage_metrics: dict[str, dict[str, object]] = {}
+        payload_is_valid = isinstance(request.payload, dict)
+        stage_metrics["validate_payload"] = _stage_metric(
+            status="ok" if payload_is_valid else "error",
+            reason="" if payload_is_valid else "payload must be an object",
+            duration_ms=0,
+        )
+        if not payload_is_valid:
+            invalid_decision = self.router.decide(request.task_type)
+            stage_metrics["load_runtime_profile"] = _stage_metric("unavailable", "payload validation failed", 0)
+            stage_metrics["build_context"] = _stage_metric("unavailable", "payload validation failed", 0)
+            stage_metrics["evaluate_context_sufficiency"] = _stage_metric("unavailable", "payload validation failed", 0)
+            stage_metrics["local_analysis"] = _stage_metric("unavailable", "payload validation failed", 0)
+            stage_metrics["provider_execution"] = _stage_metric("skipped", "inspect mode", 0)
+            stage_metrics["synthesize_result"] = _stage_metric("skipped", "inspect mode", 0)
+            stage_metrics["persistence"] = _stage_metric("skipped", "inspect mode", 0)
+            stage_metrics["return_diagnostics"] = _stage_metric("ok", "", 0)
+            return {
+                "task_type": request.task_type,
+                "payload": request.payload,
+                "route": {
+                    "preferred": invalid_decision.provider,
+                    "fallbacks": invalid_decision.fallbacks,
+                    "max_provider_retries": invalid_decision.max_provider_retries,
+                    "fallback_on": invalid_decision.fallback_on,
+                    "provider_timeout_sec": invalid_decision.provider_timeout_sec,
+                },
+                "context": {"status": "unavailable", "reason": "payload must be an object"},
+                "context_sufficiency": {
+                    "context_sufficient": False,
+                    "selected_files": [],
+                    "missing_context_risks": ["invalid_payload"],
+                    "reason": "payload must be an object",
+                },
+                "local_plan": {"status": "unavailable", "reason": "payload must be an object"},
+                "local_analysis": {"status": "unavailable", "reason": "payload must be an object"},
+                "providers": [],
+                "pipeline": _pipeline_payload(stage_metrics),
+            }
         decision = self.router.decide(request.task_type)
         planning = self._build_context_info(request)
+        stage_metrics.update(planning["stage_metrics"])
+        stage_metrics["provider_execution"] = _stage_metric(
+            status="skipped",
+            reason="inspect mode",
+            duration_ms=0,
+        )
+        stage_metrics["synthesize_result"] = _stage_metric(
+            status="skipped",
+            reason="inspect mode",
+            duration_ms=0,
+        )
+        stage_metrics["persistence"] = _stage_metric(
+            status="skipped",
+            reason="inspect mode",
+            duration_ms=0,
+        )
+        stage_metrics["return_diagnostics"] = _stage_metric(
+            status="ok",
+            reason="",
+            duration_ms=0,
+        )
         providers = [decision.provider, *decision.fallbacks]
 
         provider_status = []
@@ -202,8 +338,11 @@ class TaskRunner:
                 "provider_timeout_sec": decision.provider_timeout_sec,
             },
             "context": planning["context"],
+            "context_sufficiency": planning["context_sufficiency"],
             "local_plan": planning["local_plan"],
+            "local_analysis": planning["local_analysis"],
             "providers": provider_status,
+            "pipeline": _pipeline_payload(stage_metrics),
         }
         inspection.update(
             self._dependency_artifacts(
@@ -215,24 +354,74 @@ class TaskRunner:
         return inspection
 
     def _build_context_info(self, request: TaskRequest) -> Dict[str, object]:
+        load_started_at = time.perf_counter()
         project_id = str(request.payload.get("project_id", "")).strip() or None
         try:
             runtime_project = load_runtime_project(project_id=project_id)
+            stage_metrics = {
+                "load_runtime_profile": _stage_metric(
+                    status="ok",
+                    reason="",
+                    duration_ms=_elapsed_ms(load_started_at),
+                ),
+            }
+            context_started_at = time.perf_counter()
             bundle = ContextBuilder(runtime_project).build(
                 task_type=request.task_type,
                 payload=request.payload,
             )
         except FileNotFoundError:
+            stage_metrics = {
+                "load_runtime_profile": _stage_metric(
+                    status="error",
+                    reason="project profile not found",
+                    duration_ms=_elapsed_ms(load_started_at),
+                ),
+                "build_context": _stage_metric(
+                    status="unavailable",
+                    reason="project profile not found",
+                    duration_ms=0,
+                ),
+                "evaluate_context_sufficiency": _stage_metric(
+                    status="unavailable",
+                    reason="project profile not found",
+                    duration_ms=0,
+                ),
+                "local_analysis": _stage_metric(
+                    status="unavailable",
+                    reason="project profile not found",
+                    duration_ms=0,
+                ),
+            }
             return {
                 "context": {"status": "unavailable", "reason": "project profile not found"},
                 "local_plan_object": None,
                 "local_plan": {"status": "unavailable", "reason": "project profile not found"},
+                "local_analysis": {"status": "unavailable", "reason": "project profile not found"},
+                "context_sufficiency": {
+                    "context_sufficient": False,
+                    "selected_files": [],
+                    "missing_context_risks": ["project_profile_not_found"],
+                    "reason": "project profile not found",
+                },
+                "stage_metrics": stage_metrics,
             }
 
+        stage_metrics["build_context"] = _stage_metric(
+            status="ok",
+            reason="",
+            duration_ms=_elapsed_ms(context_started_at),
+        )
+        local_analysis_started_at = time.perf_counter()
         local_plan = build_local_task_plan(
             task_type=request.task_type,
             payload=request.payload,
             bundle=bundle,
+        )
+        stage_metrics["local_analysis"] = _stage_metric(
+            status="ok",
+            reason="",
+            duration_ms=_elapsed_ms(local_analysis_started_at),
         )
 
         context_status = "ready"
@@ -251,6 +440,31 @@ class TaskRunner:
             elif not bundle.files and not explicit_files:
                 context_status = "partial"
                 context_reason = "no target files selected"
+        missing_context_risks = []
+        if not target_repo:
+            missing_context_risks.append("target_repo_not_configured")
+        elif context_reason.startswith("target repo path not found"):
+            missing_context_risks.append("target_repo_path_missing")
+        if not bundle.files:
+            missing_context_risks.append("no_target_files_selected")
+        context_sufficiency = {
+            "context_sufficient": context_status == "ready" and len(missing_context_risks) == 0,
+            "selected_files": list(local_plan.selected_files),
+            "missing_context_risks": missing_context_risks,
+            "reason": context_reason or "context ready",
+        }
+        stage_metrics["evaluate_context_sufficiency"] = _stage_metric(
+            status="ok" if context_sufficiency["context_sufficient"] else "partial",
+            reason=context_sufficiency["reason"],
+            duration_ms=0,
+        )
+        local_analysis = {
+            "status": "ready",
+            "reason": "",
+            "agent_name": local_plan.agent_name,
+            "recommended_action": local_plan.recommended_action,
+            "local_agent_output": local_plan.local_agent_output,
+        }
 
         return {
             "context": {
@@ -264,6 +478,7 @@ class TaskRunner:
                     "configured": bool(target_repo),
                     "path": target_repo,
                 },
+                "context_sufficiency": context_sufficiency,
             },
             "local_plan_object": local_plan,
             "local_plan": {
@@ -278,7 +493,11 @@ class TaskRunner:
                 "recommended_action": local_plan.recommended_action,
                 "prompt_preview": local_plan.prompt_preview,
                 "local_agent_output": local_plan.local_agent_output,
+                "context_sufficiency": context_sufficiency,
             },
+            "local_analysis": local_analysis,
+            "context_sufficiency": context_sufficiency,
+            "stage_metrics": stage_metrics,
         }
 
     def _execute_provider(
@@ -408,6 +627,17 @@ class TaskRunner:
         result: TaskResult,
         cache_context: Dict[str, object] | None = None,
     ) -> None:
+        result.output.setdefault("pipeline", {})
+        pipeline = result.output["pipeline"]
+        if isinstance(pipeline, dict):
+            stage_metrics = pipeline.get("stage_metrics")
+            if isinstance(stage_metrics, dict):
+                stage_metrics["persistence"] = _stage_metric(status="ok", reason="", duration_ms=0)
+                stage_metrics["return_diagnostics"] = _stage_metric(status="ok", reason="", duration_ms=0)
+                pipeline["stages"] = _pipeline_stages_list(stage_metrics)
+                execution_metrics = result.output.get("execution_metrics")
+                if isinstance(execution_metrics, dict):
+                    execution_metrics["stage_metrics"] = stage_metrics
         project_id = str(request.payload.get("project_id", "unknown"))
         persistence = self.operational_store.persist_task_result(
             task_type=request.task_type,
@@ -506,6 +736,7 @@ def _execution_metrics(
     run_started_at: float,
     attempt_metrics: list[Dict[str, object]],
     cache_hit: bool,
+    stage_metrics: dict[str, dict[str, object]] | None = None,
 ) -> Dict[str, object]:
     provider_execution_ms = sum(
         int(item.get("duration_ms", 0))
@@ -518,4 +749,45 @@ def _execution_metrics(
         "provider_execution_ms": provider_execution_ms,
         "total_ms": _elapsed_ms(run_started_at),
         "attempt_metrics": attempt_metrics,
+        "stage_metrics": stage_metrics or {},
+    }
+
+
+def _stage_metric(status: str, reason: str, duration_ms: int) -> dict[str, object]:
+    return {
+        "status": status,
+        "reason": reason,
+        "duration_ms": max(duration_ms, 0),
+    }
+
+
+def _pipeline_stages_list(stage_metrics: dict[str, dict[str, object]]) -> list[dict[str, object]]:
+    ordered = []
+    for stage_name in [
+        "validate_payload",
+        "load_runtime_profile",
+        "build_context",
+        "evaluate_context_sufficiency",
+        "local_analysis",
+        "provider_execution",
+        "synthesize_result",
+        "persistence",
+        "return_diagnostics",
+    ]:
+        metric = stage_metrics.get(stage_name, {})
+        if not isinstance(metric, dict):
+            metric = {}
+        ordered.append({
+            "stage": stage_name,
+            "status": str(metric.get("status", "unknown")),
+            "reason": str(metric.get("reason", "")),
+            "duration_ms": int(metric.get("duration_ms", 0)),
+        })
+    return ordered
+
+
+def _pipeline_payload(stage_metrics: dict[str, dict[str, object]]) -> dict[str, object]:
+    return {
+        "stage_metrics": stage_metrics,
+        "stages": _pipeline_stages_list(stage_metrics),
     }

@@ -93,9 +93,21 @@
 - `[~]` transformar `TaskRunner` em executor real de pipeline
   - `TaskRunner.run` agora publica `execution_metrics` (`planning_ms`, `provider_execution_ms`, `total_ms`, `attempt_metrics`, `cache_hit`)
   - `OperationalStore` persiste `execution_metrics` no estado e no resumo de cache
+  - pipeline explícito agora já cobre estágios:
+    - `validate_payload`
+    - `load_runtime_profile`
+    - `build_context`
+    - `evaluate_context_sufficiency`
+    - `local_analysis`
+    - `provider_execution`
+    - `synthesize_result`
+    - `persistence`
+    - `return_diagnostics`
+  - `run`/`inspect` agora incluem `pipeline` + `stage_metrics` e objeto `context_sufficiency`
 - `[~]` conectar agentes ao carregamento de prompts e memória do projeto
   - `build_local_task_plan` agora retorna `local_agent_output` estruturado por agente (`repo_worker`, `micro_reviewer`, `arbiter`)
   - `TaskRunner` repassa `local_agent_output` no plano local e no metadata enviado ao provider
+  - `local_agent_output` agora também aparece como estágio explícito (`local_analysis`) no runtime
 - `[x]` padronizar interface de providers além do status `stub`
 - `[~]` adicionar fallback real entre providers
 - `[~]` externalizar retry/fallback policy para configuração por tarefa
