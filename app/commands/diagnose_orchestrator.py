@@ -21,6 +21,9 @@ def _recent_task_states(state_store: StateStore, limit: int = 5) -> list[dict]:
     recent = []
     for key in sorted(keys, reverse=True)[:limit]:
         payload = _safe_load_state(state_store, key)
+        metrics = payload.get("execution_metrics", {})
+        if not isinstance(metrics, dict):
+            metrics = {}
         recent.append({
             "key": key,
             "task_type": payload.get("task_type"),
@@ -28,6 +31,12 @@ def _recent_task_states(state_store: StateStore, limit: int = 5) -> list[dict]:
             "provider": payload.get("provider"),
             "status": payload.get("status"),
             "selected_files": payload.get("selected_files", []),
+            "execution_metrics": {
+                "cache_hit": metrics.get("cache_hit"),
+                "planning_ms": metrics.get("planning_ms"),
+                "provider_execution_ms": metrics.get("provider_execution_ms"),
+                "total_ms": metrics.get("total_ms"),
+            },
         })
     return recent
 

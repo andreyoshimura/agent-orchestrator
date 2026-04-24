@@ -299,6 +299,7 @@ class CommandEntrypointsTest(unittest.TestCase):
                 payload["storage"]["recent_task_states"][0]["selected_files"],
                 ["engine.py"],
             )
+            self.assertIn("execution_metrics", payload["storage"]["recent_task_states"][0])
 
     def test_inspect_task_returns_structured_error_for_invalid_json_payload(self) -> None:
         payload, exit_code = _invoke_command(
