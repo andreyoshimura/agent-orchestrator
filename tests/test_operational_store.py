@@ -107,6 +107,75 @@ class OperationalStoreTest(unittest.TestCase):
 
             self.assertEqual(refs_a["cache_key"], refs_b["cache_key"])
 
+    def test_cache_fingerprint_changes_when_cache_context_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            key_a = store.cache_key(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+                cache_context={"signature": "abc"},
+            )
+            key_b = store.cache_key(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+                cache_context={"signature": "def"},
+            )
+
+            self.assertNotEqual(key_a, key_b)
+
+    def test_load_cached_task_result_returns_persisted_output_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+                output={
+                    "local_plan": {"selected_files": ["paper_trade.py"]},
+                    "provider_result": {"provider": "gemini", "status": "stub", "output": {"mode": "stub"}},
+                    "provider_attempts": [{"provider": "gemini", "attempt": 1, "status": "stub", "failure_type": "success"}],
+                },
+            )
+            cached = store.load_cached_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+            )
+
+            self.assertIsNotNone(cached)
+            cached = cached or {}
+            self.assertEqual(cached["provider"], "gemini")
+            self.assertEqual(cached["status"], "stub")
+            self.assertEqual(cached["output"]["provider_result"]["provider"], "gemini")
+
+    def test_load_cached_task_result_returns_none_for_invalid_cached_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            cache_key = store.cache_key(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+            )
+            cache_store.set(cache_key, "not-json")
+
+            cached = store.load_cached_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+            )
+            self.assertIsNone(cached)
+
 
 if __name__ == "__main__":
     unittest.main()

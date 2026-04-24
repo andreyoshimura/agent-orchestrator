@@ -76,7 +76,12 @@ def main() -> int:
     provider_settings = load_provider_settings()
     router = Router(routing_config)
     budget_manager = BudgetManager(daily_limits, state_store=StateStore())
-    runner = TaskRunner(router, budget_manager, provider_settings=provider_settings)
+    runner = TaskRunner(
+        router,
+        budget_manager,
+        provider_settings=provider_settings,
+        allow_cache_reuse=_env_bool("AI_CACHE_REUSE_ENABLED", True),
+    )
     audit = AuditLog()
 
     payload = {

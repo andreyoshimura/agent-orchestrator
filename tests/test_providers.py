@@ -148,6 +148,38 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(response.output["failure_type"], "temporary")
         self.assertIn("invalid_response_json", response.output["reason"])
 
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_handles_partial_response_missing_output_text(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"resp_123"}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:missing_output_text")
+
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_handles_partial_response_with_non_string_output_text(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"resp_123","output_text":{"value":"nope"}}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:output_text_not_string")
+
     @patch("app.providers.claude_provider.urllib_request.urlopen")
     def test_claude_provider_handles_invalid_json_response(self, mock_urlopen: MagicMock) -> None:
         response_handle = MagicMock()
@@ -163,6 +195,70 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(response.status, "error")
         self.assertEqual(response.output["failure_type"], "temporary")
         self.assertEqual(response.output["reason"], "invalid_response_shape:top_level_not_object")
+
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_handles_partial_response_missing_content(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"msg_123"}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:missing_content")
+
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_handles_partial_response_with_non_list_content(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"msg_123","content":{"type":"text","text":"x"}}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:content_not_list")
+
+    @patch("app.providers.gemini_provider.urllib_request.urlopen")
+    def test_gemini_provider_handles_partial_response_missing_candidates(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"modelVersion":"test"}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "gemini",
+            ProviderSettings(name="gemini", enabled=True, model="gemini-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:missing_candidates")
+
+    @patch("app.providers.gemini_provider.urllib_request.urlopen")
+    def test_gemini_provider_handles_partial_response_with_non_list_candidates(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"candidates":{"content":{"parts":[{"text":"x"}]}}}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "gemini",
+            ProviderSettings(name="gemini", enabled=True, model="gemini-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:candidates_not_list")
 
     def test_base_provider_run_handles_internal_exception(self) -> None:
         class BrokenProvider(BaseProvider):

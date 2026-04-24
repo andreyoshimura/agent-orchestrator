@@ -40,7 +40,7 @@
 - adicionar `call_relation_summary` para leitura executiva de risco estrutural
 - sinalizar `risk_flags` para relações não resolvidas de maior impacto
 - incluir `dependency_highlights` para leitura rápida em entrypoints genéricos
-- ampliar confiabilidade de providers em cenários de resposta parcial (campos ausentes no JSON de retorno)
+- reduzir excepcionalidade de `map-dependencies` entre entrypoints genéricos e fluxo central
 
 ## Checkpoint de retomada
 
@@ -61,7 +61,24 @@
 - o próximo passo recomendado ao retomar é:
   - consolidar cenários restantes de confiabilidade no core (principalmente fluxos de comparação estrutural)
   - manter cobertura explícita para profile inválido, payload inválido e execução com target repo não configurado
-  - depois revisar se vale expandir análise estrutural para relações semânticas entre arquivos (ex.: uso de classes/funções exportadas)
+  - revisar política de invalidação de cache em casos de arquivos não selecionados, mas semanticamente relevantes
+
+## Atualização de continuidade
+
+- data da retomada: `2026-04-24`
+- bloco concluído nesta sessão:
+  - providers endurecidos para resposta parcial (JSON válido com campos ausentes/shape inválido) com erro estruturado:
+    - `openai`: `missing_output_text` e `output_text_not_string`
+    - `gemini`: `missing_candidates` e `candidates_not_list`
+    - `claude`: `missing_content` e `content_not_list`
+  - `TaskRunner.inspect` e `TaskRunner.run` agora incluem `dependency_map` + `dependency_highlights` para `map-dependencies` no fluxo genérico
+  - `inspect-task` deixou de ter lógica dedicada para `map-dependencies`, consumindo o caminho genérico do runner
+  - `routing.yaml` passou a declarar `review-file` explicitamente e ampliou fallback de `map-dependencies` para `claude` + `openai`
+  - `OperationalStore` agora persiste snapshot do resultado e permite lookup por fingerprint (`load_cached_task_result`)
+  - `TaskRunner` ganhou reutilização opcional de cache (`allow_cache_reuse`) e `task_cli` ativa por padrão com `AI_CACHE_REUSE_ENABLED` (desligável)
+  - o cache agora invalida por assinatura de conteúdo dos arquivos selecionados (hash + metadados), além do payload
+  - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
+- suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
 
 ## Encerramento do dia
 

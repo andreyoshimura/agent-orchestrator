@@ -96,8 +96,32 @@ class GeminiProvider(BaseProvider):
                     "body_preview": raw[:1000],
                 },
             )
+        if "candidates" not in data:
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:missing_candidates",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
         output_text_parts = []
         candidates = data.get("candidates", [])
+        if not isinstance(candidates, list):
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:candidates_not_list",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
         for candidate in candidates:
             content = candidate.get("content", {}) if isinstance(candidate, dict) else {}
             for part in content.get("parts", []):

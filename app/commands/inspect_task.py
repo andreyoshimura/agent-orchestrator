@@ -4,7 +4,6 @@ import sys
 from app.cli.payload_parser import parse_json_payload
 from app.cli.task_cli import _load_yaml, _resolve_daily_limits
 from app.core.budget_manager import BudgetManager
-from app.core.dependency_mapper import map_python_dependencies, summarize_dependency_map
 from app.core.project_loader import load_runtime_project
 from app.core.router import Router
 from app.core.task_runner import TaskRequest, TaskRunner
@@ -47,12 +46,6 @@ def main() -> int:
     }
 
     inspection = runner.inspect(TaskRequest(task_type=task_type, payload=payload))
-    if task_type == "map-dependencies":
-        selected_files = inspection.get("local_plan", {}).get("selected_files", [])
-        target_file = str(payload.get("file") or (selected_files[0] if selected_files else "")).strip()
-        dependency_map = map_python_dependencies(runtime_project.target_repo, target_file)
-        inspection["dependency_map"] = dependency_map
-        inspection["dependency_highlights"] = summarize_dependency_map(dependency_map)
 
     result = {
         "status": "ok",

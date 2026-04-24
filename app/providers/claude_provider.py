@@ -100,7 +100,31 @@ class ClaudeProvider(BaseProvider):
                     "body_preview": raw[:1000],
                 },
             )
+        if "content" not in data:
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:missing_content",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
         content = data.get("content", [])
+        if not isinstance(content, list):
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:content_not_list",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
         output_text_parts = []
         for item in content:
             if isinstance(item, dict) and item.get("type") == "text":

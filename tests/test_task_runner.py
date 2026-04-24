@@ -128,6 +128,102 @@ class TaskRunnerTest(unittest.TestCase):
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)
 
+    @patch.object(TaskRunner, "_execute_provider")
+    def test_run_reuses_cached_result_when_enabled(self, mock_execute_provider) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+                operational_store = OperationalStore(
+                    state_store=StateStore(base_dir=f"{tmpdir}/state"),
+                    cache_store=CacheStore(base_dir=f"{tmpdir}/cache"),
+                )
+
+                mock_execute_provider.return_value = {"provider": "claude", "status": "stub", "output": {"mode": "stub"}}
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+                    budget_manager=BudgetManager({"claude": 1.0}),
+                    provider_settings={
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                    operational_store=operational_store,
+                    allow_cache_reuse=True,
+                )
+                request = TaskRequest(
+                    task_type="review-file",
+                    payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                )
+                first = runner.run(request)
+                second = runner.run(request)
+
+                self.assertEqual(first.status, "stub")
+                self.assertEqual(second.status, "stub")
+                self.assertEqual(mock_execute_provider.call_count, 1)
+                self.assertEqual(second.output["cache"]["hit"], True)
+                self.assertIn("provider_attempts", second.output)
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    @patch.object(TaskRunner, "_execute_provider")
+    def test_run_invalidates_cached_result_when_selected_file_changes(self, mock_execute_provider) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper-v1')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+                operational_store = OperationalStore(
+                    state_store=StateStore(base_dir=f"{tmpdir}/state"),
+                    cache_store=CacheStore(base_dir=f"{tmpdir}/cache"),
+                )
+
+                mock_execute_provider.side_effect = [
+                    {"provider": "claude", "status": "stub", "output": {"mode": "stub-v1"}},
+                    {"provider": "claude", "status": "stub", "output": {"mode": "stub-v2"}},
+                ]
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "claude", "fallback": []}}),
+                    budget_manager=BudgetManager({"claude": 1.0}),
+                    provider_settings={
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                    operational_store=operational_store,
+                    allow_cache_reuse=True,
+                )
+                request = TaskRequest(
+                    task_type="review-file",
+                    payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                )
+
+                first = runner.run(request)
+                with open(sample_path, "w", encoding="utf-8") as handle:
+                    handle.write("print('paper-v2')\n")
+                second = runner.run(request)
+
+                self.assertEqual(first.status, "stub")
+                self.assertEqual(second.status, "stub")
+                self.assertEqual(mock_execute_provider.call_count, 2)
+                self.assertEqual(first.output["cache"]["hit"], False)
+                self.assertEqual(second.output["cache"]["hit"], False)
+                self.assertEqual(first.output["provider_result"]["output"]["mode"], "stub-v1")
+                self.assertEqual(second.output["provider_result"]["output"]["mode"], "stub-v2")
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
     def test_inspect_marks_context_partial_when_target_repo_is_not_configured(self) -> None:
         old_project = os.environ.get("AI_DEFAULT_PROJECT")
         old_target = os.environ.get("AI_TARGET_REPO")
@@ -479,6 +575,54 @@ class TaskRunnerTest(unittest.TestCase):
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)
 
+    @patch.object(TaskRunner, "_execute_provider")
+    def test_run_falls_back_on_temporary_invalid_response_shape(self, mock_execute_provider) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                mock_execute_provider.side_effect = [
+                    {
+                        "provider": "gemini",
+                        "status": "error",
+                        "output": {
+                            "reason": "invalid_response_shape:missing_candidates",
+                            "failure_type": "temporary",
+                        },
+                    },
+                    {"provider": "claude", "status": "stub", "output": {"mode": "stub"}},
+                ]
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "gemini", "fallback": ["claude"], "execution": {"max_provider_retries": 0, "fallback_on": ["temporary"]}}}),
+                    budget_manager=BudgetManager({"gemini": 1.0, "claude": 1.0}),
+                    provider_settings={
+                        "gemini": ProviderSettings(name="gemini", enabled=True, model="", api_key="", api_base=""),
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                )
+                result = runner.run(
+                    TaskRequest(
+                        task_type="review-file",
+                        payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                    )
+                )
+
+                self.assertEqual(result.provider, "claude")
+                self.assertEqual(result.status, "stub")
+                self.assertEqual(result.output["provider_attempts"][0]["failure_type"], "temporary")
+                self.assertEqual(result.output["provider_attempts"][1]["provider"], "claude")
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
     def test_run_degrades_when_provider_settings_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             sample_path = os.path.join(tmpdir, "paper_trade.py")
@@ -613,6 +757,39 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(result.output["context"]["status"], "partial")
                 self.assertEqual(result.output["context"]["reason"], "no target files selected")
                 self.assertEqual(result.output["local_plan"]["selected_files"], [])
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_inspect_includes_dependency_map_for_map_dependencies_task(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("import os\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                runner = TaskRunner(
+                    router=Router({"map-dependencies": {"preferred": "gemini", "fallback": []}}),
+                    budget_manager=BudgetManager({"gemini": 1.0}),
+                    provider_settings={
+                        "gemini": ProviderSettings(name="gemini", enabled=True, model="", api_key="", api_base=""),
+                    },
+                )
+                inspection = runner.inspect(
+                    TaskRequest(
+                        task_type="map-dependencies",
+                        payload={"project_id": "ia-trade", "file": "paper_trade.py", "objective": "Mapear dependências"},
+                    )
+                )
+
+                self.assertEqual(inspection["dependency_map"]["status"], "ok")
+                self.assertEqual(inspection["dependency_map"]["file"], "paper_trade.py")
+                self.assertEqual(inspection["dependency_highlights"]["status"], "ready")
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)

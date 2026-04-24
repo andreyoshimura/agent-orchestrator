@@ -94,6 +94,9 @@
 
 - `[x]` persistir orçamento diário em `var/state`
 - `[~]` persistir cache de contexto e resultados reutilizáveis
+  - lookup por fingerprint de payload agora disponível em `OperationalStore`
+  - `task_cli` já pode reutilizar cache por padrão (`AI_CACHE_REUSE_ENABLED`, com `force_refresh` no payload para bypass)
+  - fingerprint agora incorpora assinatura de conteúdo dos arquivos selecionados para invalidação automática
 - `[~]` criar comandos de diagnóstico do estado global do orchestrator
 - `[~]` reduzir dependência de wrappers manuais para tarefas recorrentes
   - aliases legados de arquivo explícito agora delegam para `inspect-task` / `assemble-context`
@@ -108,6 +111,9 @@
 - `[x]` cobrir payload JSON inválido e payload não-objeto nos entrypoints genéricos
 - `[x]` validar comportamento com múltiplos profiles além de `ia-trade`
 - `[x]` documentar workflow recomendado de uso local
+- `[x]` endurecer providers para respostas parciais (campos ausentes / shape inválido) com erro estruturado consistente
+- `[x]` cobrir fallback em cenário de resposta parcial classificada como temporária
+- `[x]` cobrir fluxo E2E `inspect-task -> task_cli` com degradação, fallback e persistência
 
 ### Avanços recentes de confiabilidade
 
@@ -126,6 +132,7 @@
 - redução de excepcionalidade de `map-dependencies`:
   - parser estrutural extraído para `app/core/dependency_mapper.py`
   - `inspect-task map-dependencies` e `assemble-context map-dependencies` retornam `dependency_map`
+  - `task_cli map-dependencies` agora também retorna `dependency_map` e `dependency_highlights` pelo fluxo genérico do `TaskRunner`
   - comando legado `map-dependencies` agora usa `load_runtime_project` e funciona com profiles alternativos
   - `dependency_map` agora inclui também símbolos (`functions/classes/methods`) e chamadas locais/por atributo
   - `dependency_map` agora também resolve imports locais para caminhos candidatos (grafo cross-file básico)
@@ -140,6 +147,7 @@
   - classificação de erro HTTP por tipo (`rate_limit`, `authorization`, `invalid_request`, `temporary`)
   - `*_API_BASE` opcional para override de endpoint por provider
   - respostas inválidas de provider (JSON malformado/shape inesperado) agora retornam erro estruturado sem interromper o pipeline
+  - respostas parciais de provider (campos ausentes/shape de campos inválido) agora retornam erro estruturado sem falso `completed`
   - exceções internas de provider agora são isoladas em `BaseProvider.run` com falha classificada como temporária
 
 ## Evidências do que foi baixado

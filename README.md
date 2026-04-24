@@ -30,6 +30,8 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 - O resultado mais recente de cada tarefa por projeto é persistido em `var/state`
 - Fingerprints resumidos de execução de tarefas são armazenados em cache em `var/cache`
 - O uso diário de orçamento por provider é persistido em `var/state`
+- O `task_cli` pode reutilizar resultado em cache por fingerprint de payload para reduzir reexecução em tarefas repetidas
+- O fingerprint de cache também considera assinatura de conteúdo dos arquivos selecionados (hash + metadados), invalidando automaticamente após mudança de arquivo
 - Essa persistência é local e reversível; ela existe para reduzir trabalho manual repetido de inspeção entre execuções
 
 ## Papéis planejados dos providers
@@ -90,6 +92,7 @@ set -a && source .env && set +a
 - mantenha `AI_REPO_WRITE_ENABLED=false` por padrão
 - preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
 - use `OPENAI_API_BASE`, `GEMINI_API_BASE` e `CLAUDE_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
+- `AI_CACHE_REUSE_ENABLED=true` (default no `task_cli`) reutiliza resultado de payload idêntico; use `false` para desativar globalmente
 
 ### 2. Retomar sessão
 
@@ -120,9 +123,11 @@ bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objecti
 
 ```bash
 python3 -m app.cli.task_cli review-file '{"query":"paper","objective":"Revisar entrypoint paper"}'
+python3 -m app.cli.task_cli map-dependencies '{"file":"paper_trade.py","objective":"Mapear dependências"}'
 ```
 
 - esse é o caminho recomendado quando quiser efetivamente passar pelo roteador, orçamento, retry, fallback e persistência operacional
+- para forçar reexecução sem cache em uma chamada específica, inclua `"force_refresh": true` no payload JSON
 
 ### 5. Usar aliases legados só quando fizer sentido
 

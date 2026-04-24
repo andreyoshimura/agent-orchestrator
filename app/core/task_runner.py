@@ -1,8 +1,11 @@
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
 from typing import Dict, Optional
 
 from app.core.context_builder import ContextBuilder
+from app.core.dependency_mapper import map_python_dependencies, summarize_dependency_map
 from app.core.operational_store import OperationalStore
 from app.core.provider_failure_policy import (
     classify_provider_failure,
@@ -40,18 +43,42 @@ class TaskRunner:
         budget_manager: BudgetManager,
         provider_settings: Dict[str, ProviderSettings] | None = None,
         operational_store: OperationalStore | None = None,
+        allow_cache_reuse: bool = False,
     ):
         self.router = router
         self.budget_manager = budget_manager
         self.provider_settings = provider_settings or {}
         self.operational_store = operational_store or OperationalStore()
+        self.allow_cache_reuse = allow_cache_reuse
 
     def run(self, request: TaskRequest, estimated_cost: float = 0.0) -> TaskResult:
         decision = self.router.decide(request.task_type)
+        project_id = str(request.payload.get("project_id", "unknown"))
         planning = self._build_context_info(request)
         context_info = planning["context"]
         local_plan = planning["local_plan"]
         local_plan_object = planning["local_plan_object"]
+        dependency_artifacts = self._dependency_artifacts(request, local_plan, context_info=context_info)
+        cache_context = self._build_cache_context(local_plan, context_info)
+
+        if self.allow_cache_reuse and not bool(request.payload.get("force_refresh")):
+            cached_result = self.operational_store.load_cached_task_result(
+                task_type=request.task_type,
+                project_id=project_id,
+                payload=request.payload,
+                cache_context=cache_context,
+            )
+            if cached_result:
+                output = {
+                    **cached_result["output"],
+                    "cache": {"hit": True, "cache_key": cached_result["cache_key"]},
+                }
+                return TaskResult(
+                    provider=str(cached_result["provider"]),
+                    task_type=request.task_type,
+                    status=str(cached_result["status"]),
+                    output=output,
+                )
         attempted_providers = []
         chosen_provider: Optional[str] = None
         provider_result: Dict[str, object] | None = None
@@ -93,11 +120,13 @@ class TaskRunner:
                     "reason": "no provider completed successfully",
                     "context": context_info,
                     "local_plan": local_plan,
+                    **dependency_artifacts,
                     "provider_attempts": attempted_providers,
                     "provider_result": provider_result,
+                    "cache": {"hit": False},
                 },
             )
-            self._persist_result(request, result)
+            self._persist_result(request, result, cache_context=cache_context)
             return result
 
         result = TaskResult(
@@ -108,11 +137,13 @@ class TaskRunner:
                 "payload": request.payload,
                 "context": context_info,
                 "local_plan": local_plan,
+                **dependency_artifacts,
                 "provider_result": provider_result,
                 "provider_attempts": attempted_providers,
+                "cache": {"hit": False},
             },
         )
-        self._persist_result(request, result)
+        self._persist_result(request, result, cache_context=cache_context)
         return result
 
     def inspect(self, request: TaskRequest, estimated_cost: float = 0.0) -> Dict[str, object]:
@@ -136,7 +167,7 @@ class TaskRunner:
                 "usable_for_estimated_cost": self._provider_usable(provider_name, estimated_cost),
             })
 
-        return {
+        inspection = {
             "task_type": request.task_type,
             "payload": request.payload,
             "route": {
@@ -149,6 +180,14 @@ class TaskRunner:
             "local_plan": planning["local_plan"],
             "providers": provider_status,
         }
+        inspection.update(
+            self._dependency_artifacts(
+                request,
+                planning["local_plan"],
+                context_info=planning["context"],
+            )
+        )
+        return inspection
 
     def _build_context_info(self, request: TaskRequest) -> Dict[str, object]:
         project_id = str(request.payload.get("project_id", "")).strip() or None
@@ -322,12 +361,96 @@ class TaskRunner:
         failure_type = classify_provider_failure(status, output)
         return failure_type not in {"provider_unavailable", "configuration"}
 
-    def _persist_result(self, request: TaskRequest, result: TaskResult) -> None:
+    def _persist_result(
+        self,
+        request: TaskRequest,
+        result: TaskResult,
+        cache_context: Dict[str, object] | None = None,
+    ) -> None:
         project_id = str(request.payload.get("project_id", "unknown"))
         persistence = self.operational_store.persist_task_result(
             task_type=request.task_type,
             project_id=project_id,
             payload=request.payload,
             output=result.output,
+            cache_context=cache_context,
         )
         result.output["persistence"] = persistence
+
+    def _dependency_artifacts(
+        self,
+        request: TaskRequest,
+        local_plan: Dict[str, object],
+        context_info: Dict[str, object] | None = None,
+    ) -> Dict[str, object]:
+        if request.task_type != "map-dependencies":
+            return {}
+
+        target_repo = str(request.payload.get("target_repo", "")).strip()
+        if not target_repo and isinstance(context_info, dict):
+            target_repo_info = context_info.get("target_repo", {})
+            if isinstance(target_repo_info, dict):
+                target_repo = str(target_repo_info.get("path", "")).strip()
+        selected_files = local_plan.get("selected_files", [])
+        fallback_file = selected_files[0] if isinstance(selected_files, list) and selected_files else ""
+        target_file = str(request.payload.get("file") or fallback_file).strip()
+        dependency_map = map_python_dependencies(target_repo, target_file)
+
+        return {
+            "dependency_map": dependency_map,
+            "dependency_highlights": summarize_dependency_map(dependency_map),
+        }
+
+    def _build_cache_context(self, local_plan: Dict[str, object], context_info: Dict[str, object]) -> Dict[str, object]:
+        target_repo_info = context_info.get("target_repo", {})
+        if not isinstance(target_repo_info, dict):
+            return {"target_repo": "", "selected_files": [], "signature": ""}
+        target_repo = str(target_repo_info.get("path", "")).strip()
+        selected_files = local_plan.get("selected_files", [])
+        if not isinstance(selected_files, list):
+            selected_files = []
+        normalized_files = [str(item) for item in selected_files if isinstance(item, str)]
+        file_fingerprints = self._file_fingerprints(target_repo, normalized_files)
+        signature = hashlib.sha256(
+            json.dumps(file_fingerprints, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        return {
+            "target_repo": target_repo,
+            "selected_files": normalized_files,
+            "file_fingerprints": file_fingerprints,
+            "signature": signature,
+        }
+
+    def _file_fingerprints(self, target_repo: str, selected_files: list[str]) -> list[Dict[str, object]]:
+        if not target_repo:
+            return []
+        repo_root = Path(target_repo).resolve()
+        fingerprints: list[Dict[str, object]] = []
+        for relative_path in selected_files:
+            full_path = (repo_root / relative_path).resolve()
+            if not str(full_path).startswith(str(repo_root)):
+                fingerprints.append({
+                    "file": relative_path,
+                    "exists": False,
+                    "reason": "out_of_repo",
+                })
+                continue
+            if not full_path.exists() or not full_path.is_file():
+                fingerprints.append({
+                    "file": relative_path,
+                    "exists": False,
+                    "reason": "missing",
+                })
+                continue
+            content = full_path.read_bytes()
+            stat = full_path.stat()
+            fingerprints.append(
+                {
+                    "file": relative_path,
+                    "exists": True,
+                    "size": stat.st_size,
+                    "mtime_ns": int(stat.st_mtime_ns),
+                    "sha256": hashlib.sha256(content).hexdigest(),
+                }
+            )
+        return fingerprints

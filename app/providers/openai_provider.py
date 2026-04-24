@@ -98,6 +98,30 @@ class OpenAIProvider(BaseProvider):
                     "body_preview": raw[:1000],
                 },
             )
+        if "output_text" not in data:
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:missing_output_text",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
+        if not isinstance(data.get("output_text"), str):
+            return ProviderResponse(
+                provider=self.name,
+                status="error",
+                output={
+                    "mode": "live",
+                    "model": self.settings.model,
+                    "reason": "invalid_response_shape:output_text_not_string",
+                    "failure_type": "temporary",
+                    "body_preview": raw[:1000],
+                },
+            )
         return ProviderResponse(
             provider=self.name,
             status="completed",
