@@ -42,6 +42,21 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(response.output["output_text"], "ok")
 
     @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_uses_timeout_from_request_metadata(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"resp_123","output_text":"ok"}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test", "provider_timeout_sec": 7}))
+
+        self.assertEqual(response.status, "completed")
+        self.assertEqual(mock_urlopen.call_args.kwargs.get("timeout"), 7)
+
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
     def test_openai_provider_classifies_http_failure(self, mock_urlopen: MagicMock) -> None:
         mock_urlopen.side_effect = HTTPError(
             url="https://api.openai.com/v1/responses",

@@ -23,6 +23,7 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 
 - As preferências e fallbacks de provider por tarefa ficam em `config/routing.yaml`
 - O comportamento de retry e fallback também é configurado por tarefa em `routing.<task>.execution`
+- o timeout HTTP por tarefa também pode ser configurado em `routing.<task>.execution.provider_timeout_sec`
 - O core mantém defaults seguros, mas a política específica de cada tarefa deve ser ajustada na configuração, não codificada diretamente no runtime
 
 ## Persistência operacional

@@ -8,6 +8,7 @@ class ClaudeProvider(BaseProvider):
     name = "claude"
 
     def _run(self, request: ProviderRequest) -> ProviderResponse:
+        timeout_sec = _timeout_seconds(request.metadata.get("provider_timeout_sec", 30))
         if not self.settings.ready_for_live_execution:
             missing_fields = []
             if not self.settings.model.strip():
@@ -47,7 +48,7 @@ class ClaudeProvider(BaseProvider):
         )
 
         try:
-            with urllib_request.urlopen(req, timeout=30) as response_handle:
+            with urllib_request.urlopen(req, timeout=timeout_sec) as response_handle:
                 raw = response_handle.read().decode("utf-8")
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="ignore")
@@ -151,3 +152,13 @@ def _http_failure_type(status_code: int) -> str:
     if status_code in {400, 404, 422}:
         return "invalid_request"
     return "temporary"
+
+
+def _timeout_seconds(raw_value: object, default: int = 30) -> int:
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+    if value <= 0:
+        return default
+    return value

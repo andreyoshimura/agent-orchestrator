@@ -99,6 +99,7 @@
 - `[x]` padronizar interface de providers além do status `stub`
 - `[~]` adicionar fallback real entre providers
 - `[~]` externalizar retry/fallback policy para configuração por tarefa
+  - `provider_timeout_sec` por tarefa agora está disponível no `routing.<task>.execution` e aplicado no runtime de providers
 
 ## Fase 4 - Persistência e autonomia
 

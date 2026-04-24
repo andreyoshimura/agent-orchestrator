@@ -94,6 +94,7 @@
   - `diagnose-orchestrator` agora expõe métricas de índice de cache (`cache_indexed_entry_count`, `cache_inspect_entry_count`) e chaves recentes de cache de inspeção
   - `TaskRunner` agora publica `execution_metrics` por execução (planejamento, tentativas de provider e tempo total), com persistência no `OperationalStore`
   - `map-dependencies` legado agora usa `TaskRunner.inspect` internamente para consumir `dependency_map` do fluxo genérico
+  - timeout de provider por tarefa (`provider_timeout_sec`) agora é lido de `routing.<task>.execution` e aplicado no runtime HTTP dos providers
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
 - suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
 

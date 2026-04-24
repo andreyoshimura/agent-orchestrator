@@ -9,6 +9,7 @@ class RouteDecision:
     fallbacks: List[str]
     max_provider_retries: int
     fallback_on: List[str]
+    provider_timeout_sec: int
 
 
 class Router:
@@ -24,10 +25,12 @@ class Router:
             execution = {}
         max_provider_retries = int(execution.get("max_provider_retries", 1))
         fallback_on = list(execution.get("fallback_on", ["temporary", "rate_limit", "network", "configuration", "provider_unavailable"]))
+        provider_timeout_sec = int(execution.get("provider_timeout_sec", 30))
         return RouteDecision(
             task_type=task_type,
             provider=provider,
             fallbacks=fallbacks,
             max_provider_retries=max_provider_retries,
             fallback_on=fallback_on,
+            provider_timeout_sec=provider_timeout_sec,
         )

@@ -45,6 +45,7 @@ class TaskRunnerTest(unittest.TestCase):
 
                 self.assertEqual(inspection["route"]["preferred"], "claude")
                 self.assertEqual(inspection["route"]["fallbacks"], ["gemini"])
+                self.assertEqual(inspection["route"]["provider_timeout_sec"], 30)
                 self.assertEqual(inspection["local_plan"]["selected_files"], ["paper_trade.py"])
                 self.assertEqual(inspection["context"]["status"], "ready")
                 self.assertEqual(
@@ -124,6 +125,10 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(
                     result.output["provider_result"]["output"]["metadata"]["local_agent_output"]["agent"],
                     "micro_reviewer",
+                )
+                self.assertEqual(
+                    result.output["provider_result"]["output"]["metadata"]["provider_timeout_sec"],
+                    30,
                 )
                 self.assertIn("execution_metrics", result.output)
                 self.assertEqual(result.output["execution_metrics"]["cache_hit"], False)
@@ -360,6 +365,10 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(result.output["local_plan"]["selected_files"], ["engine.py"])
                 self.assertEqual(result.output["context"]["status"], "ready")
                 self.assertEqual(result.output["local_plan"]["prompt_name"], "micro_reviewer")
+                self.assertEqual(
+                    result.output["provider_result"]["output"]["metadata"]["provider_timeout_sec"],
+                    30,
+                )
             finally:
                 _restore_env("AI_PROJECTS_ROOT", old_projects_root)
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
