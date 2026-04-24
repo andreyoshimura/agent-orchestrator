@@ -25,6 +25,7 @@ class LocalTaskPlan:
     selected_files: list[str]
     context_sections: list[str]
     context_length: int
+    local_agent_output: dict[str, Any]
 
 
 def build_local_task_plan(task_type: str, payload: Dict[str, Any], bundle: ContextBundle) -> LocalTaskPlan:
@@ -41,6 +42,23 @@ def build_local_task_plan(task_type: str, payload: Dict[str, Any], bundle: Conte
         },
         project_memory=_compose_project_memory(bundle),
     )
+    local_agent_payload = {
+        "task_type": task_type,
+        **payload,
+        "selected_files": bundle.files,
+        "context_sections": bundle.sections,
+    }
+    local_agent_output: dict[str, Any] = {"agent": agent.name, "payload": {"status": "unavailable"}}
+    if hasattr(agent, "run_local"):
+        raw_output = agent.run_local(  # type: ignore[attr-defined]
+            task_payload=local_agent_payload,
+            project_memory=_compose_project_memory(bundle),
+        )
+        if hasattr(raw_output, "payload") and hasattr(raw_output, "agent"):
+            local_agent_output = {
+                "agent": str(getattr(raw_output, "agent")),
+                "payload": dict(getattr(raw_output, "payload")),
+            }
 
     preview_header = (
         f"Agent: {agent.name}\n"
@@ -60,6 +78,7 @@ def build_local_task_plan(task_type: str, payload: Dict[str, Any], bundle: Conte
         selected_files=bundle.files,
         context_sections=bundle.sections,
         context_length=len(bundle.context_text),
+        local_agent_output=local_agent_output,
     )
 
 

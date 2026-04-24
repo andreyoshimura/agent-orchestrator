@@ -252,6 +252,7 @@ class TaskRunner:
                 "context_length": local_plan.context_length,
                 "recommended_action": local_plan.recommended_action,
                 "prompt_preview": local_plan.prompt_preview,
+                "local_agent_output": local_plan.local_agent_output,
             },
         }
 
@@ -296,6 +297,7 @@ class TaskRunner:
                     "task_type": request.task_type,
                     "project_id": request.payload.get("project_id", ""),
                     "selected_files": getattr(local_plan, "selected_files", []),
+                    "local_agent_output": getattr(local_plan, "local_agent_output", {}),
                     "context": context_info,
                 },
             )

@@ -116,9 +116,15 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertIn("You are the micro_reviewer agent.", result.output["local_plan"]["prompt_template_preview"])
                 self.assertIn("Review the selected files first", result.output["local_plan"]["recommended_action"])
                 self.assertIn("paper_trade.py", result.output["local_plan"]["prompt_preview"])
+                self.assertEqual(result.output["local_plan"]["local_agent_output"]["agent"], "micro_reviewer")
+                self.assertEqual(result.output["local_plan"]["local_agent_output"]["payload"]["status"], "ready")
                 self.assertEqual(result.output["provider_result"]["provider"], "claude")
                 self.assertEqual(result.output["provider_result"]["status"], "stub")
                 self.assertGreater(result.output["provider_result"]["output"]["prompt_length"], 0)
+                self.assertEqual(
+                    result.output["provider_result"]["output"]["metadata"]["local_agent_output"]["agent"],
+                    "micro_reviewer",
+                )
                 self.assertEqual(result.output["provider_attempts"][0]["provider"], "claude")
                 self.assertEqual(result.output["provider_attempts"][0]["attempt"], 1)
                 self.assertEqual(result.output["provider_attempts"][0]["status"], "stub")

@@ -89,6 +89,7 @@
     - limites por tarefa (`task_file_limits`)
     - queries por tarefa (`task_queries`)
     - arquivos priorizados por tarefa (`pinned_files_by_task`)
+  - agentes locais agora retornam saída estruturada (`local_agent_output`) além de prompt, e isso já entra no `local_plan` e no metadata do provider
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
 - suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
 

@@ -91,6 +91,8 @@
 
 - `[~]` transformar `TaskRunner` em executor real de pipeline
 - `[~]` conectar agentes ao carregamento de prompts e memória do projeto
+  - `build_local_task_plan` agora retorna `local_agent_output` estruturado por agente (`repo_worker`, `micro_reviewer`, `arbiter`)
+  - `TaskRunner` repassa `local_agent_output` no plano local e no metadata enviado ao provider
 - `[x]` padronizar interface de providers além do status `stub`
 - `[~]` adicionar fallback real entre providers
 - `[~]` externalizar retry/fallback policy para configuração por tarefa
