@@ -117,6 +117,7 @@
 - `[x]` cobrir fallback em cenário de resposta parcial classificada como temporária
 - `[x]` cobrir fluxo E2E `inspect-task -> task_cli` com degradação, fallback e persistência
 - `[x]` cobrir concorrência leve de persistência local (`StateStore`/`CacheStore`)
+- `[x]` cobrir cache E2E do `task_cli` para hit/miss conforme mudança de arquivos selecionados
 
 ### Avanços recentes de confiabilidade
 

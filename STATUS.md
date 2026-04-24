@@ -80,6 +80,9 @@
   - `inspect-task` agora suporta cache com TTL (`AI_INSPECT_CACHE_REUSE_ENABLED` / `AI_INSPECT_CACHE_TTL_SEC`) e bypass por `"force_refresh": true`
   - `StateStore` e `CacheStore` agora usam gravação atômica (`temp file` + `replace`) para reduzir risco de corrupção em concorrência leve
   - cobertura de testes ampliada para leitura/escrita concorrente leve em storage local
+  - cobertura E2E ampliada para cache do `task_cli`:
+    - hit quando os arquivos selecionados não mudam
+    - miss automático quando o conteúdo do arquivo selecionado muda
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
 - suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
 

@@ -169,6 +169,93 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertEqual(payload["output"]["dependency_map"]["file"], "engine.py")
             self.assertEqual(payload["output"]["dependency_highlights"]["status"], "ready")
 
+    def test_task_cli_reuses_cached_result_when_selected_files_do_not_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            operational_store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_CACHE_REUSE_ENABLED": "true",
+            }):
+                with patch("app.core.task_runner.OperationalStore", return_value=operational_store):
+                    with patch.object(TaskRunner, "_execute_provider") as mock_execute_provider:
+                        mock_execute_provider.return_value = {
+                            "provider": "claude",
+                            "status": "stub",
+                            "output": {"mode": "stub"},
+                        }
+                        first = _run_command(
+                            task_cli.main,
+                            [
+                                "task_cli.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+                        second = _run_command(
+                            task_cli.main,
+                            [
+                                "task_cli.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+
+            self.assertEqual(mock_execute_provider.call_count, 1)
+            self.assertEqual(first["output"]["cache"]["hit"], False)
+            self.assertEqual(second["output"]["cache"]["hit"], True)
+            self.assertEqual(second["status"], "stub")
+            self.assertEqual(second["provider"], "claude")
+
+    def test_task_cli_invalidates_cached_result_when_selected_file_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            operational_store = OperationalStore(state_store=state_store, cache_store=cache_store)
+            engine_file = repo_root / "engine.py"
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_CACHE_REUSE_ENABLED": "true",
+            }):
+                with patch("app.core.task_runner.OperationalStore", return_value=operational_store):
+                    with patch.object(TaskRunner, "_execute_provider") as mock_execute_provider:
+                        mock_execute_provider.side_effect = [
+                            {"provider": "claude", "status": "stub", "output": {"mode": "stub-v1"}},
+                            {"provider": "claude", "status": "stub", "output": {"mode": "stub-v2"}},
+                        ]
+                        first = _run_command(
+                            task_cli.main,
+                            [
+                                "task_cli.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+                        engine_file.write_text("print('engine v2')\n", encoding="utf-8")
+                        second = _run_command(
+                            task_cli.main,
+                            [
+                                "task_cli.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+
+            self.assertEqual(mock_execute_provider.call_count, 2)
+            self.assertEqual(first["output"]["cache"]["hit"], False)
+            self.assertEqual(second["output"]["cache"]["hit"], False)
+            self.assertEqual(first["output"]["provider_result"]["output"]["mode"], "stub-v1")
+            self.assertEqual(second["output"]["provider_result"]["output"]["mode"], "stub-v2")
+
     def test_diagnose_orchestrator_reports_alternate_profile_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)
