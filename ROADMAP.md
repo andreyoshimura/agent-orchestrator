@@ -111,6 +111,28 @@
 - `[~]` criar comandos de diagnóstico do estado global do orchestrator
 - `[~]` criar comandos de diagnóstico do estado global do orchestrator
   - `diagnose-orchestrator` agora inclui métricas de índice de cache e chaves recentes de cache `inspect`
+  - `diagnose-orchestrator` agora agrega resumo de status recentes (`recent_task_status_summary`) e sinais de consistência do cache (`storage_health`)
+  - `diagnose-orchestrator` agora agrega alertas de orçamento (`budget.alerts`) com limiar configurável (`AI_BUDGET_ALERT_THRESHOLD_RATIO`)
+  - `inspect-project` agora inclui `storage_quicklook` com resumo de status recente e sinais de consistência do cache para retomada rápida
+  - `diagnose-orchestrator` e `inspect-project` agora incluem `health_summary` agregado (`ok`/`degraded`) para leitura operacional rápida
+  - `diagnose-orchestrator` e `inspect-project` agora suportam `--health-only` para payload compacto em automações (cron/CI)
+  - `diagnose-orchestrator` e `inspect-project` agora suportam `--fail-on-degraded` para fail-fast em automações quando a saúde agregada estiver degradada
+  - `scripts/healthcheck.sh` agora oferece wrapper de automação para CI/cron com saída compacta e retorno `0/2` (inclui opção `--inspect-project`)
+  - `diagnose-orchestrator`, `inspect-project` e `scripts/healthcheck.sh` agora suportam `--compact` para emissão de JSON em linha única
+  - `scripts/healthcheck.sh` agora suporta `--all` para agregar `diagnose-orchestrator` + `inspect-project` em um status unificado
+  - `scripts/healthcheck.sh --all` agora suporta `--strict` para emitir somente resumo/checks sem `results` detalhados
+  - `scripts/healthcheck.sh` agora suporta `--quiet` para modo silencioso quando saúde final estiver `ok`
+  - `scripts/healthcheck.sh` agora suporta `--output <arquivo>` para persistência do payload JSON em automações
+  - também suporta `--output-dir <diretório>` para arquivo timestampado por execução
+  - e `--latest-link` para manter symlink fixo `latest.json` para o último resultado
+  - com `--latest-link-name <nome>` para personalizar o symlink de leitura
+  - e `--meta` para anexar metadados operacionais no payload de healthcheck
+  - com `--meta-fields <csv>` para emissão seletiva de campos no bloco `meta`
+  - com `--meta-fields all`/`*` para seleção total explícita de campos de metadados
+  - com `--meta-drop-nulls` para remover chaves nulas na emissão
+  - e `--meta-flatten` para emissão sem bloco aninhado (`meta_*` no topo)
+  - e `--meta-prefix <texto>` para personalizar o prefixo aplicado no flatten
+  - payload de healthcheck agora inclui `artifact.path`/`artifact.latest_link` quando há saída em arquivo
 - `[~]` reduzir recomputação de inspeção local
   - `inspect-task` agora suporta cache com TTL por payload e bypass via `force_refresh`
   - cache de inspeção agora invalida automaticamente quando arquivos selecionados mudam

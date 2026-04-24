@@ -89,8 +89,7 @@ case "${TASK_TYPE}" in
     ;;
   inspect-project)
     # Inspeciona o profile atual e o repo alvo configurado.
-    PROJECT_ID="${1:-${AI_DEFAULT_PROJECT:-ia-trade}}"
-    run_module app.commands.inspect_project "${PROJECT_ID}"
+    run_module app.commands.inspect_project "$@"
     ;;
   assemble-context)
     # Monta contexto reutilizável para uma tarefa usando bootstrap, memórias e arquivos alvo.
@@ -118,9 +117,13 @@ case "${TASK_TYPE}" in
     # Mostra o orçamento diário acumulado e restante por provider.
     run_module app.commands.inspect_budget
     ;;
+  healthcheck)
+    # Healthcheck compacto para automação (retorna exit 2 quando degradado).
+    bash scripts/healthcheck.sh "$@"
+    ;;
   diagnose-orchestrator)
     # Mostra estado global do orchestrator, budget e persistência local.
-    run_module app.commands.diagnose_orchestrator
+    run_module app.commands.diagnose_orchestrator "$@"
     ;;
   *)
     # Fallback para o roteador genérico.

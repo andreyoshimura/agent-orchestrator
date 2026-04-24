@@ -1,6 +1,8 @@
 import json
 import os
+import sys
 from pathlib import Path
+from typing import Any
 
 from app.cli.task_cli import _load_yaml, _resolve_daily_limits
 from app.core.budget_manager import BudgetManager
@@ -41,7 +43,98 @@ def _recent_task_states(state_store: StateStore, limit: int = 5) -> list[dict]:
     return recent
 
 
+def _recent_task_status_summary(state_store: StateStore, limit: int = 25) -> dict[str, Any]:
+    counts: dict[str, int] = {}
+    keys = state_store.list_keys(prefix="last_task_")
+    for key in sorted(keys, reverse=True)[:limit]:
+        payload = _safe_load_state(state_store, key)
+        status = payload.get("status")
+        normalized = status if isinstance(status, str) and status else "unknown"
+        counts[normalized] = counts.get(normalized, 0) + 1
+    return {
+        "sampled_state_count": min(len(keys), limit),
+        "statuses": dict(sorted(counts.items())),
+    }
+
+
+def _budget_alert_threshold_ratio() -> float:
+    default = 0.1
+    raw = os.getenv("AI_BUDGET_ALERT_THRESHOLD_RATIO")
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return default
+    return min(max(parsed, 0.0), 1.0)
+
+
+def _budget_alerts(budget_summary: dict[str, Any], threshold_ratio: float) -> list[dict[str, Any]]:
+    providers = budget_summary.get("providers", {})
+    if not isinstance(providers, dict):
+        return []
+    alerts: list[dict[str, Any]] = []
+    for provider, details in sorted(providers.items()):
+        if not isinstance(details, dict):
+            continue
+        limit = details.get("limit")
+        remaining = details.get("remaining")
+        if not isinstance(limit, (int, float)) or not isinstance(remaining, (int, float)) or limit <= 0:
+            continue
+        remaining_ratio = float(remaining) / float(limit)
+        if remaining_ratio > threshold_ratio:
+            continue
+        alerts.append({
+            "provider": provider,
+            "severity": "exhausted" if remaining <= 0 else "low_remaining",
+            "remaining": float(remaining),
+            "limit": float(limit),
+            "remaining_ratio": remaining_ratio,
+        })
+    return alerts
+
+
+def _build_health_summary(
+    project_status: dict[str, Any],
+    storage_health: dict[str, Any],
+    budget_alerts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    signals: list[str] = []
+    if project_status.get("status") != "ok":
+        signals.append("project_profile_error")
+    if not bool(storage_health.get("cache_index_consistent", True)):
+        signals.append("cache_index_inconsistent")
+    exhausted_alerts = sum(1 for item in budget_alerts if item.get("severity") == "exhausted")
+    if exhausted_alerts > 0:
+        signals.append("budget_exhausted")
+    low_budget_alerts = sum(1 for item in budget_alerts if item.get("severity") == "low_remaining")
+    if low_budget_alerts > 0:
+        signals.append("budget_low_remaining")
+    return {
+        "status": "degraded" if signals else "ok",
+        "signals": signals,
+        "budget_alert_count": len(budget_alerts),
+        "budget_exhausted_count": exhausted_alerts,
+        "budget_low_remaining_count": low_budget_alerts,
+    }
+
+
+def _parse_args(args: list[str]) -> tuple[bool, bool, bool]:
+    health_only = "--health-only" in args
+    fail_on_degraded = "--fail-on-degraded" in args
+    compact = "--compact" in args
+    return health_only, fail_on_degraded, compact
+
+
+def _print_payload(payload: dict[str, Any], compact: bool) -> None:
+    if compact:
+        print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        return
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
 def main() -> int:
+    health_only, fail_on_degraded, compact = _parse_args(sys.argv[1:])
     state_store = StateStore()
     cache_store = CacheStore()
     budgets_config = _load_yaml("config/budgets.yaml")
@@ -64,21 +157,64 @@ def main() -> int:
             "reason": str(exc),
         }
 
+    indexed_cache_entries = cache_store.list_entries(limit=1000)
+    inspect_cache_entries = cache_store.list_entries(prefix="inspect:", limit=1000)
+    indexed_with_file_count = sum(
+        1
+        for entry in indexed_cache_entries
+        if (cache_store.base_dir / f"{entry.get('digest', '')}.txt").exists()
+    )
+    cache_entry_count = cache_store.count()
+    storage_health = {
+        "cache_index_missing_file_count": max(len(indexed_cache_entries) - indexed_with_file_count, 0),
+        "cache_unindexed_file_estimate": max(cache_entry_count - indexed_with_file_count, 0),
+        "cache_index_consistent": (
+            len(indexed_cache_entries) == cache_entry_count and indexed_with_file_count == cache_entry_count
+        ),
+    }
+
+    budget_summary = budget_manager.summary()
+    alert_threshold_ratio = _budget_alert_threshold_ratio()
+    budget_summary["alert_threshold_ratio"] = alert_threshold_ratio
+    budget_summary["alerts"] = _budget_alerts(budget_summary, threshold_ratio=alert_threshold_ratio)
+    health_summary = _build_health_summary(project_status, storage_health, budget_summary["alerts"])
+
+    if health_only:
+        _print_payload({
+            "status": "ok",
+            "mode": "health-only",
+            "health_summary": health_summary,
+            "project": {
+                "status": project_status.get("status"),
+                "project_id": project_status.get("project_id"),
+            },
+            "checks": {
+                "cache_index_consistent": storage_health["cache_index_consistent"],
+                "budget_alert_count": len(budget_summary["alerts"]),
+            },
+        }, compact=compact)
+        if fail_on_degraded and health_summary.get("status") == "degraded":
+            return 2
+        return 0
+
     result = {
         "status": "ok",
+        "health_summary": health_summary,
         "project": project_status,
-        "budget": budget_manager.summary(),
+        "budget": budget_summary,
         "storage": {
             "state_dir": str(state_store.base_dir),
             "state_key_count": len(state_store.list_keys()),
             "cache_dir": str(cache_store.base_dir),
-            "cache_entry_count": cache_store.count(),
-            "cache_indexed_entry_count": len(cache_store.list_entries(limit=1000)),
-            "cache_inspect_entry_count": len(cache_store.list_entries(prefix="inspect:", limit=1000)),
+            "cache_entry_count": cache_entry_count,
+            "cache_indexed_entry_count": len(indexed_cache_entries),
+            "cache_inspect_entry_count": len(inspect_cache_entries),
             "recent_inspect_cache_keys": [
                 item.get("key")
-                for item in cache_store.list_entries(prefix="inspect:", limit=5)
+                for item in inspect_cache_entries[:5]
             ],
+            "recent_task_status_summary": _recent_task_status_summary(state_store),
+            "storage_health": storage_health,
             "recent_task_states": _recent_task_states(state_store),
         },
         "config": {
@@ -86,7 +222,9 @@ def main() -> int:
             "budgets_exists": Path("config/budgets.yaml").exists(),
         },
     }
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    _print_payload(result, compact=compact)
+    if fail_on_degraded and health_summary.get("status") == "degraded":
+        return 2
     return 0
 
 

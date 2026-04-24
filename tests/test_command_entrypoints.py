@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,6 +21,15 @@ class CommandEntrypointsTest(unittest.TestCase):
     def test_inspect_project_supports_alternate_profile_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                "last_task_demo_review-file",
+                {
+                    "status": "stub",
+                },
+            )
+            cache_store.set("demo:review-file:engine", "cached")
 
             with _patched_env({
                 "AI_PROJECTS_ROOT": str(projects_root),
@@ -27,10 +37,12 @@ class CommandEntrypointsTest(unittest.TestCase):
                 "AI_TARGET_REPO_ALT": str(repo_root),
                 "AI_REPO_WRITE_ENABLED_ALT": "true",
             }):
-                payload = _run_command(
-                    inspect_project.main,
-                    ["inspect_project.py", "demo"],
-                )
+                with patch("app.commands.inspect_project.StateStore", return_value=state_store):
+                    with patch("app.commands.inspect_project.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            inspect_project.main,
+                            ["inspect_project.py", "demo"],
+                        )
 
             self.assertEqual(payload["status"], "ok")
             self.assertEqual(payload["project_id"], "demo")
@@ -39,6 +51,110 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertEqual(payload["target_repo"]["path"], str(repo_root.resolve()))
             self.assertTrue(payload["target_repo"]["exists"])
             self.assertIn("engine.py", payload["target_repo"]["top_level_entries"])
+            self.assertEqual(payload["health_summary"]["status"], "ok")
+            self.assertEqual(payload["health_summary"]["signals"], [])
+            self.assertEqual(payload["health_summary"]["missing_profile_file_count"], 0)
+            self.assertEqual(payload["storage_quicklook"]["recent_task_status_summary"]["statuses"], {"stub": 1})
+            self.assertEqual(payload["storage_quicklook"]["storage_health"]["cache_entry_count"], 1)
+            self.assertEqual(payload["storage_quicklook"]["storage_health"]["cache_indexed_entry_count"], 1)
+            self.assertTrue(payload["storage_quicklook"]["storage_health"]["cache_index_consistent"])
+
+    def test_inspect_project_reports_cache_index_inconsistency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            cache_store.set("demo:review-file:engine", "cached")
+            index = json.loads(cache_store.index_path.read_text(encoding="utf-8"))
+            index["deadbeef"] = {
+                "key": "inspect:ghost",
+                "updated_at": 123.0,
+            }
+            cache_store.index_path.write_text(json.dumps(index), encoding="utf-8")
+            (cache_store.base_dir / "orphan_unindexed.txt").write_text("orphan", encoding="utf-8")
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_REPO_WRITE_ENABLED_ALT": "true",
+            }):
+                with patch("app.commands.inspect_project.StateStore", return_value=state_store):
+                    with patch("app.commands.inspect_project.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            inspect_project.main,
+                            ["inspect_project.py", "demo"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["storage_quicklook"]["storage_health"]["cache_entry_count"], 2)
+            self.assertEqual(payload["storage_quicklook"]["storage_health"]["cache_indexed_entry_count"], 2)
+            self.assertEqual(payload["storage_quicklook"]["storage_health"]["cache_index_missing_file_count"], 1)
+            self.assertEqual(payload["storage_quicklook"]["storage_health"]["cache_unindexed_file_estimate"], 1)
+            self.assertFalse(payload["storage_quicklook"]["storage_health"]["cache_index_consistent"])
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertIn("cache_index_inconsistent", payload["health_summary"]["signals"])
+
+    def test_inspect_project_health_only_mode_returns_compact_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                with patch("app.commands.inspect_project.StateStore", return_value=state_store):
+                    with patch("app.commands.inspect_project.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            inspect_project.main,
+                            ["inspect_project.py", "demo", "--health-only"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["mode"], "health-only")
+            self.assertEqual(payload["project_id"], "demo")
+            self.assertEqual(payload["health_summary"]["status"], "ok")
+            self.assertTrue(payload["checks"]["target_repo_exists"])
+            self.assertTrue(payload["checks"]["cache_index_consistent"])
+            self.assertNotIn("profile_files", payload)
+            self.assertNotIn("storage_quicklook", payload)
+
+    def test_inspect_project_fail_on_degraded_returns_exit_code_2(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, _repo_root = _create_demo_project(tmpdir)
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": None,
+            }):
+                payload, exit_code = _invoke_command(
+                    inspect_project.main,
+                    ["inspect_project.py", "demo", "--health-only", "--fail-on-degraded"],
+                )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertEqual(exit_code, 2)
+
+    def test_inspect_project_health_only_compact_outputs_single_line_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                raw, exit_code = _invoke_command_raw(
+                    inspect_project.main,
+                    ["inspect_project.py", "demo", "--health-only", "--compact"],
+                )
+            self.assertEqual(exit_code, 0)
+            self.assertNotIn("\n", raw.strip())
+            payload = json.loads(raw)
+            self.assertEqual(payload["mode"], "health-only")
 
     def test_inspect_task_supports_alternate_profile_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -286,6 +402,9 @@ class CommandEntrypointsTest(unittest.TestCase):
                         )
 
             self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["health_summary"]["status"], "ok")
+            self.assertEqual(payload["health_summary"]["signals"], [])
+            self.assertEqual(payload["health_summary"]["budget_alert_count"], 0)
             self.assertEqual(payload["project"]["status"], "ok")
             self.assertEqual(payload["project"]["project_id"], "demo")
             self.assertEqual(payload["project"]["target_repo"], str(repo_root))
@@ -295,11 +414,245 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertEqual(payload["storage"]["cache_indexed_entry_count"], 1)
             self.assertEqual(payload["storage"]["cache_inspect_entry_count"], 0)
             self.assertEqual(payload["storage"]["recent_inspect_cache_keys"], [])
+            self.assertEqual(payload["storage"]["recent_task_status_summary"]["sampled_state_count"], 1)
+            self.assertEqual(payload["storage"]["recent_task_status_summary"]["statuses"], {"stub": 1})
+            self.assertEqual(payload["storage"]["storage_health"]["cache_index_missing_file_count"], 0)
+            self.assertEqual(payload["storage"]["storage_health"]["cache_unindexed_file_estimate"], 0)
+            self.assertTrue(payload["storage"]["storage_health"]["cache_index_consistent"])
+            self.assertEqual(payload["budget"]["alert_threshold_ratio"], 0.1)
+            self.assertEqual(payload["budget"]["alerts"], [])
             self.assertEqual(
                 payload["storage"]["recent_task_states"][0]["selected_files"],
                 ["engine.py"],
             )
             self.assertIn("execution_metrics", payload["storage"]["recent_task_states"][0])
+
+    def test_diagnose_orchestrator_reports_cache_index_inconsistency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            cache_store.set("demo:review-file:engine", "cached")
+            index = json.loads(cache_store.index_path.read_text(encoding="utf-8"))
+            index["deadbeef"] = {
+                "key": "inspect:ghost",
+                "updated_at": 123.0,
+            }
+            cache_store.index_path.write_text(json.dumps(index), encoding="utf-8")
+            (cache_store.base_dir / "orphan_unindexed.txt").write_text("orphan", encoding="utf-8")
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertIn("cache_index_inconsistent", payload["health_summary"]["signals"])
+            self.assertEqual(payload["storage"]["cache_entry_count"], 2)
+            self.assertEqual(payload["storage"]["cache_indexed_entry_count"], 2)
+            self.assertEqual(payload["storage"]["storage_health"]["cache_index_missing_file_count"], 1)
+            self.assertEqual(payload["storage"]["storage_health"]["cache_unindexed_file_estimate"], 1)
+            self.assertFalse(payload["storage"]["storage_health"]["cache_index_consistent"])
+
+    def test_diagnose_orchestrator_reports_budget_alerts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"daily_budget_{date.today().isoformat()}",
+                {
+                    "date": date.today().isoformat(),
+                    "providers": {
+                        "claude": 9.5,
+                        "gemini": 10.0,
+                        "openai": 1.0,
+                    },
+                },
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "BUDGET_CLAUDE_DAILY_USD": "10",
+                "BUDGET_GEMINI_DAILY_USD": "10",
+                "BUDGET_OPENAI_DAILY_USD": "10",
+                "AI_BUDGET_ALERT_THRESHOLD_RATIO": "0.2",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["budget"]["alert_threshold_ratio"], 0.2)
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertIn("budget_exhausted", payload["health_summary"]["signals"])
+            self.assertIn("budget_low_remaining", payload["health_summary"]["signals"])
+            self.assertEqual(payload["health_summary"]["budget_alert_count"], 2)
+            self.assertEqual(payload["health_summary"]["budget_exhausted_count"], 1)
+            self.assertEqual(payload["health_summary"]["budget_low_remaining_count"], 1)
+            self.assertEqual(
+                payload["budget"]["alerts"],
+                [
+                    {
+                        "provider": "claude",
+                        "severity": "low_remaining",
+                        "remaining": 0.5,
+                        "limit": 10.0,
+                        "remaining_ratio": 0.05,
+                    },
+                    {
+                        "provider": "gemini",
+                        "severity": "exhausted",
+                        "remaining": 0.0,
+                        "limit": 10.0,
+                        "remaining_ratio": 0.0,
+                    },
+                ],
+            )
+
+    def test_diagnose_orchestrator_uses_default_budget_alert_threshold_when_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"daily_budget_{date.today().isoformat()}",
+                {
+                    "date": date.today().isoformat(),
+                    "providers": {
+                        "claude": 9.2,
+                        "gemini": 0.0,
+                        "openai": 0.0,
+                    },
+                },
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "BUDGET_CLAUDE_DAILY_USD": "10",
+                "AI_BUDGET_ALERT_THRESHOLD_RATIO": "invalid",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["budget"]["alert_threshold_ratio"], 0.1)
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertIn("budget_low_remaining", payload["health_summary"]["signals"])
+            self.assertEqual(payload["budget"]["alerts"][0]["provider"], "claude")
+
+    def test_diagnose_orchestrator_health_only_mode_returns_compact_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"daily_budget_{date.today().isoformat()}",
+                {
+                    "date": date.today().isoformat(),
+                    "providers": {
+                        "claude": 10.0,
+                        "gemini": 0.0,
+                        "openai": 0.0,
+                    },
+                },
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "BUDGET_CLAUDE_DAILY_USD": "10",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py", "--health-only"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["mode"], "health-only")
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertIn("budget_exhausted", payload["health_summary"]["signals"])
+            self.assertEqual(payload["checks"]["budget_alert_count"], 1)
+            self.assertTrue(payload["checks"]["cache_index_consistent"])
+            self.assertNotIn("storage", payload)
+            self.assertNotIn("budget", payload)
+
+    def test_diagnose_orchestrator_fail_on_degraded_returns_exit_code_2(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"daily_budget_{date.today().isoformat()}",
+                {
+                    "date": date.today().isoformat(),
+                    "providers": {
+                        "claude": 10.0,
+                    },
+                },
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "BUDGET_CLAUDE_DAILY_USD": "10",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload, exit_code = _invoke_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py", "--health-only", "--fail-on-degraded"],
+                        )
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertEqual(exit_code, 2)
+
+    def test_diagnose_orchestrator_health_only_compact_outputs_single_line_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        raw, exit_code = _invoke_command_raw(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py", "--health-only", "--compact"],
+                        )
+
+            self.assertEqual(exit_code, 0)
+            self.assertNotIn("\n", raw.strip())
+            payload = json.loads(raw)
+            self.assertEqual(payload["mode"], "health-only")
 
     def test_inspect_task_returns_structured_error_for_invalid_json_payload(self) -> None:
         payload, exit_code = _invoke_command(
@@ -602,11 +955,16 @@ def _run_command(command_main, argv: list[str]) -> dict:
 
 
 def _invoke_command(command_main, argv: list[str]) -> tuple[dict, int]:
+    raw, exit_code = _invoke_command_raw(command_main, argv)
+    return json.loads(raw), exit_code
+
+
+def _invoke_command_raw(command_main, argv: list[str]) -> tuple[str, int]:
     stdout = io.StringIO()
     with patch.object(sys, "argv", argv):
         with patch("sys.stdout", new=stdout):
             exit_code = command_main()
-    return json.loads(stdout.getvalue()), exit_code
+    return stdout.getvalue(), exit_code
 
 
 if __name__ == "__main__":

@@ -91,7 +91,29 @@
     - arquivos priorizados por tarefa (`pinned_files_by_task`)
   - `task_prompt_overrides` por profile agora permite escolher prompt/agente por tipo de tarefa sem alterar a camada global
   - agentes locais agora retornam saída estruturada (`local_agent_output`) além de prompt, e isso já entra no `local_plan` e no metadata do provider
-  - `diagnose-orchestrator` agora expõe métricas de índice de cache (`cache_indexed_entry_count`, `cache_inspect_entry_count`) e chaves recentes de cache de inspeção
+- `diagnose-orchestrator` agora expõe métricas de índice de cache (`cache_indexed_entry_count`, `cache_inspect_entry_count`) e chaves recentes de cache de inspeção
+- `diagnose-orchestrator` agora também inclui `recent_task_status_summary` e `storage_health` para sinalizar inconsistências entre arquivos de cache e índice local
+- `diagnose-orchestrator` agora também inclui alertas de orçamento (`budget.alerts`) com limiar configurável por `AI_BUDGET_ALERT_THRESHOLD_RATIO`
+- `inspect-project` agora inclui `storage_quicklook` com `recent_task_status_summary` e `storage_health` para inspeção rápida de retomada
+- `diagnose-orchestrator` e `inspect-project` agora expõem `health_summary` agregado (`ok`/`degraded`) com sinais operacionais para automação
+- `diagnose-orchestrator` e `inspect-project` agora suportam `--health-only` para saída compacta de automação (checks essenciais + `health_summary`)
+- `diagnose-orchestrator` e `inspect-project` agora suportam `--fail-on-degraded` para retornar `exit code 2` quando o estado agregado estiver degradado
+- `scripts/healthcheck.sh` agora encapsula o healthcheck compacto para CI/cron com retorno `0/2` e modo opcional `--inspect-project`
+- `diagnose-orchestrator`, `inspect-project` e `scripts/healthcheck.sh` agora suportam `--compact` para JSON em linha única
+- `scripts/healthcheck.sh` agora suporta `--all` para rodar `diagnose-orchestrator` + `inspect-project` e agregar resultado com status único (`ok`/`degraded`/`error`)
+- `scripts/healthcheck.sh` agora suporta `--strict` (com `--all`) para suprimir `results` detalhados e manter payload mínimo de CI
+- `scripts/healthcheck.sh` agora suporta `--quiet` para não emitir output quando o status final estiver `ok`
+- `scripts/healthcheck.sh` agora suporta `--output <arquivo>` para persistir o payload JSON gerado em disco
+- `scripts/healthcheck.sh` agora também suporta `--output-dir <diretório>` para gravar arquivo timestampado por execução
+- `scripts/healthcheck.sh` agora suporta `--latest-link` (com `--output-dir`) para atualizar `latest.json` automaticamente
+- `scripts/healthcheck.sh` agora suporta `--latest-link-name <nome>` para personalizar o symlink de último resultado
+- `scripts/healthcheck.sh` agora suporta `--meta` para incluir metadados operacionais (`generated_at`, `host`, `project_id`, `argv`) no JSON
+- `scripts/healthcheck.sh` agora suporta `--meta-fields <csv>` para filtrar quais campos de `meta` serão emitidos
+- `scripts/healthcheck.sh` agora aceita `--meta-fields all` (ou `*`) como atalho para todos os campos suportados
+- `scripts/healthcheck.sh` agora suporta `--meta-drop-nulls` para suprimir valores nulos no bloco/flatten de metadados
+- `scripts/healthcheck.sh` agora suporta `--meta-flatten` para promover `meta` ao nível raiz com prefixo `meta_`
+- `scripts/healthcheck.sh` agora suporta `--meta-prefix <texto>` para customizar o prefixo usado no flatten
+- `scripts/healthcheck.sh` agora inclui `artifact.path` (e `artifact.latest_link` quando disponível) no payload ao gravar saída em arquivo
   - `TaskRunner` agora publica `execution_metrics` por execução (planejamento, tentativas de provider e tempo total), com persistência no `OperationalStore`
   - `map-dependencies` legado agora usa `TaskRunner.inspect` internamente para consumir `dependency_map` do fluxo genérico
   - timeout de provider por tarefa (`provider_timeout_sec`) agora é lido de `routing.<task>.execution` e aplicado no runtime HTTP dos providers

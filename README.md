@@ -57,6 +57,20 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 - `bash scripts/task.sh inspect-task <task-type> '<json>'` mostra uma prévia do roteamento, arquivos selecionados, plano local e disponibilidade dos providers para qualquer tarefa
 - `bash scripts/task.sh inspect-budget` mostra o gasto diário atual e o orçamento restante por provider
 - `bash scripts/task.sh diagnose-orchestrator` mostra diagnósticos de projeto, runtime, configuração e armazenamento
+- `bash scripts/healthcheck.sh` roda healthcheck compacto para automação (retorna `2` quando degradado)
+- `bash scripts/healthcheck.sh --all` executa `diagnose-orchestrator` + `inspect-project` e agrega saúde em um único payload
+- `bash scripts/healthcheck.sh --all --strict` retorna só resumo/checks (sem bloco `results`) para reduzir payload em CI
+- `bash scripts/healthcheck.sh --quiet` não imprime output quando tudo está `ok` (útil para cron silencioso)
+- `bash scripts/healthcheck.sh --meta` inclui metadados operacionais no payload (`generated_at`, `host`, `project_id`, `argv`)
+- `--meta-fields generated_at,project_id` filtra quais campos entram no bloco `meta`
+- `--meta-fields all` (ou `*`) usa todos os campos permitidos
+- `--meta-drop-nulls` remove campos de `meta` com valor nulo
+- `--meta-flatten` promove os campos para o topo como `meta_generated_at`, `meta_project_id`, etc.
+- `--meta-prefix ctx_` personaliza o prefixo do flatten (ex.: `ctx_generated_at`)
+- `bash scripts/healthcheck.sh --output /tmp/health.json` grava o payload JSON em arquivo
+- `bash scripts/healthcheck.sh --output-dir /tmp/healthchecks` grava em arquivo timestampado dentro do diretório
+- `bash scripts/healthcheck.sh --output-dir /tmp/healthchecks --latest-link` atualiza `/tmp/healthchecks/latest.json` para o arquivo mais recente
+- `bash scripts/healthcheck.sh --output-dir /tmp/healthchecks --latest-link-name atual.json` usa nome customizado para o symlink
 - `bash scripts/task.sh assemble-context <task-type> '<json>'` monta um contexto reutilizável de tarefa a partir de fontes globais e do projeto
 - `bash scripts/task.sh list-python-files` lista os arquivos Python do repositório-alvo configurado
 
@@ -105,12 +119,32 @@ set -a && source .env && set +a
 bash scripts/task.sh inspect-project
 bash scripts/task.sh diagnose-orchestrator
 bash scripts/task.sh inspect-budget
+bash scripts/healthcheck.sh
 ```
 
-- `inspect-project` valida profile, arquivos do projeto e repo alvo
+- `inspect-project` valida profile, arquivos do projeto e repo alvo, inclui `storage_quicklook` e expõe `health_summary` (`ok`/`degraded`) para leitura rápida
 - `diagnose-orchestrator` mostra estado de projeto, storage e execuções recentes
-- `diagnose-orchestrator` também mostra métricas de índice de cache e chaves recentes de cache de `inspect-task`
+- `diagnose-orchestrator` também mostra métricas de índice de cache, chaves recentes de cache de `inspect-task`, resumo de status recentes e `health_summary` agregado
+- `diagnose-orchestrator` também mostra alertas de orçamento (`budget.alerts`) com limiar configurável por `AI_BUDGET_ALERT_THRESHOLD_RATIO` (default `0.1`)
+- ambos suportam `--health-only` para retornar payload compacto com `health_summary` e checks essenciais (útil em cron/CI)
+- ambos suportam `--fail-on-degraded` para retornar `exit code 2` quando `health_summary.status=degraded` (fail-fast em automação)
+- ambos suportam `--compact` para emitir JSON em linha única (útil para pipelines shell)
 - `inspect-budget` mostra orçamento diário já consumido por provider
+- `healthcheck.sh` retorna payload compacto e código de saída adequado para cron/CI (`0=ok`, `2=degraded`)
+- `healthcheck.sh --all` retorna degradado se qualquer check degradar e inclui resultados individuais em `results`
+- `healthcheck.sh --all --strict` mantém o mesmo status/exit code, mas omite `results` detalhados
+- `healthcheck.sh --quiet` mantém exit code e só imprime JSON quando houver `degraded`/`error`
+- `healthcheck.sh --meta` adiciona bloco `meta` útil para trilha operacional em logs/artefatos
+- `healthcheck.sh --meta-fields <csv>` permite reduzir esse bloco para campos específicos
+- `healthcheck.sh --meta-fields all` (ou `*`) restaura todos os campos suportados
+- `healthcheck.sh --meta-drop-nulls` remove campos nulos antes da emissão
+- `healthcheck.sh --meta-flatten` evita bloco aninhado e move os campos para o nível raiz
+- `healthcheck.sh --meta-prefix <texto>` personaliza o prefixo usado em `--meta-flatten`
+- `healthcheck.sh --output <arquivo>` grava payload mesmo com `--quiet` (para auditoria/pipeline)
+- `healthcheck.sh --output-dir <diretório>` gera `healthcheck-YYYYmmdd-HHMMSS-<pid>.json` automaticamente
+- `healthcheck.sh --latest-link` (com `--output-dir`) mantém um symlink `latest.json` para leitura simples por automações
+- `healthcheck.sh --latest-link-name <nome>` personaliza esse nome (ex.: `atual.json`)
+- quando usa `--output`/`--output-dir`, o payload também inclui `artifact.path` (e `artifact.latest_link` quando aplicável)
 
 ### 3. Inspecionar antes de executar
 
