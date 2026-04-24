@@ -109,7 +109,7 @@
 
 ## Fase 5 - Confiabilidade
 
-- `[~]` ampliar testes para comandos, ranking e montagem de contexto
+- `[x]` ampliar testes para comandos, ranking e montagem de contexto
 - `[x]` cobrir cenários sem `AI_TARGET_REPO` e sem profile válido nos entrypoints genéricos
 - `[x]` cobrir payload JSON inválido e payload não-objeto nos entrypoints genéricos
 - `[x]` validar comportamento com múltiplos profiles além de `ia-trade`
