@@ -1,8 +1,14 @@
 import json
 import os
 import sys
-from app.core.dependency_mapper import map_python_dependencies
+
+from app.cli.task_cli import _load_yaml, _resolve_daily_limits
+from app.core.budget_manager import BudgetManager
 from app.core.project_loader import load_runtime_project
+from app.core.router import Router
+from app.core.task_runner import TaskRequest, TaskRunner
+from app.providers.config import load_provider_settings
+from app.storage.state_store import StateStore
 
 
 def main() -> int:
@@ -18,7 +24,30 @@ def main() -> int:
         print(json.dumps({"status": "error", "reason": str(exc)}, ensure_ascii=False, indent=2))
         return 1
 
-    mapping = map_python_dependencies(runtime_project.target_repo, relative_path)
+    routing_config = _load_yaml("config/routing.yaml").get("routing", {})
+    budgets_config = _load_yaml("config/budgets.yaml")
+    provider_settings = load_provider_settings()
+    budget_manager = BudgetManager(_resolve_daily_limits(budgets_config), state_store=StateStore())
+    runner = TaskRunner(
+        router=Router(routing_config),
+        budget_manager=budget_manager,
+        provider_settings=provider_settings,
+    )
+    inspection = runner.inspect(
+        TaskRequest(
+            task_type="map-dependencies",
+            payload={
+                "project_id": runtime_project.project_id,
+                "target_repo": runtime_project.target_repo,
+                "write_enabled": runtime_project.write_enabled,
+                "file": relative_path,
+                "objective": "Map local and external dependencies for the selected file.",
+            },
+        )
+    )
+    mapping = inspection.get("dependency_map", {})
+    if not isinstance(mapping, dict):
+        mapping = {"status": "error", "reason": "dependency map unavailable"}
     if mapping.get("status") != "ok":
         print(json.dumps(mapping, ensure_ascii=False, indent=2))
         return 1

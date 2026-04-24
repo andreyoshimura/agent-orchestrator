@@ -71,6 +71,7 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 ## Comandos ainda dedicados
 
 - `bash scripts/task.sh map-dependencies <file.py>` continua como comando dedicado para parsing estrutural via AST, mas agora usa o mesmo carregamento de profile/runtime do fluxo genérico
+- internamente, o comando dedicado consome o `dependency_map` produzido pelo fluxo genérico (`TaskRunner.inspect`) para reduzir caminhos especiais
 
 ## Recomendações de uso
 

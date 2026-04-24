@@ -116,7 +116,7 @@
   - aliases legados de arquivo explícito agora delegam para `inspect-task` / `assemble-context`
   - aliases legados de seleção Python agora delegam para `inspect-task` / `assemble-context`
   - `summarize-repo-area` agora delega para `assemble-context summarize-module`
-  - `map-dependencies` permanece dedicado para parsing estrutural via AST, mas agora compartilha runtime/profile e inspeção estrutural com entrypoints genéricos
+  - `map-dependencies` permanece dedicado para UX/compatibilidade, mas agora usa `TaskRunner.inspect` e consome `dependency_map` do fluxo genérico
 
 ## Fase 5 - Confiabilidade
 
