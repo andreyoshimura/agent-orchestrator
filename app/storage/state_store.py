@@ -1,5 +1,7 @@
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, Dict
 
 
@@ -20,12 +22,29 @@ class StateStore:
             return {}
         try:
             return json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, FileNotFoundError):
             return {}
 
     def save(self, key: str, payload: Dict[str, Any]) -> None:
         path = self._path(key)
-        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        serialized = json.dumps(payload, indent=2, ensure_ascii=False)
+        temp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=str(self.base_dir),
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                handle.write(serialized)
+                handle.flush()
+                os.fsync(handle.fileno())
+                temp_path = handle.name
+            os.replace(temp_path, path)
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.unlink(temp_path)
 
     def list_keys(self, prefix: str = "") -> list[str]:
         keys: list[str] = []

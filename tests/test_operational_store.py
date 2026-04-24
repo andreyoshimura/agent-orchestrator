@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 import tempfile
 import unittest
@@ -175,6 +176,56 @@ class OperationalStoreTest(unittest.TestCase):
                 payload={"query": "paper"},
             )
             self.assertIsNone(cached)
+
+    def test_state_store_handles_light_concurrent_writes_without_invalid_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            key = "concurrent"
+            state_store.save(key, {"value": -1, "text": "seed"})
+
+            def writer(i: int) -> None:
+                state_store.save(key, {"value": i, "text": "x" * 128})
+
+            def reader() -> dict:
+                return state_store.load(key)
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                for i in range(120):
+                    executor.submit(writer, i)
+                    payload = executor.submit(reader).result()
+                    self.assertIsInstance(payload, dict)
+                    self.assertIn("value", payload)
+                    self.assertIn("text", payload)
+
+            final_payload = state_store.load(key)
+            self.assertIsInstance(final_payload.get("value"), int)
+            self.assertEqual(final_payload.get("text"), "x" * 128)
+
+    def test_cache_store_handles_light_concurrent_writes_without_partial_reads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            key = "concurrent-cache"
+            cache_store.set(key, json.dumps({"value": -1, "kind": "seed"}))
+
+            def writer(i: int) -> None:
+                cache_store.set(key, json.dumps({"value": i, "kind": "cache"}))
+
+            def reader() -> dict:
+                raw = cache_store.get(key)
+                self.assertIsNotNone(raw)
+                return json.loads(raw or "{}")
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                for i in range(120):
+                    writer_future = executor.submit(writer, i)
+                    writer_future.result()
+                    payload = executor.submit(reader).result()
+                    self.assertIn("value", payload)
+                    self.assertEqual(payload.get("kind"), "cache")
+
+            final_payload = json.loads(cache_store.get(key) or "{}")
+            self.assertIsInstance(final_payload.get("value"), int)
+            self.assertEqual(final_payload.get("kind"), "cache")
 
 
 if __name__ == "__main__":

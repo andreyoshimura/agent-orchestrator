@@ -116,6 +116,7 @@
 - `[x]` endurecer providers para respostas parciais (campos ausentes / shape inválido) com erro estruturado consistente
 - `[x]` cobrir fallback em cenário de resposta parcial classificada como temporária
 - `[x]` cobrir fluxo E2E `inspect-task -> task_cli` com degradação, fallback e persistência
+- `[x]` cobrir concorrência leve de persistência local (`StateStore`/`CacheStore`)
 
 ### Avanços recentes de confiabilidade
 
@@ -131,6 +132,7 @@
   - persistência resiliente para saída degradada sem `provider_result`
   - chave de cache determinística para payloads com ordem diferente de campos
   - consumo de budget não é mais registrado quando provider está indisponível/configuração inválida
+  - escrita atômica em `StateStore`/`CacheStore` para reduzir risco de leitura parcial em concorrência leve
 - redução de excepcionalidade de `map-dependencies`:
   - parser estrutural extraído para `app/core/dependency_mapper.py`
   - `inspect-task map-dependencies` e `assemble-context map-dependencies` retornam `dependency_map`
