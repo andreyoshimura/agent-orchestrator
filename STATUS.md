@@ -96,7 +96,17 @@
   - `map-dependencies` legado agora usa `TaskRunner.inspect` internamente para consumir `dependency_map` do fluxo genérico
   - timeout de provider por tarefa (`provider_timeout_sec`) agora é lido de `routing.<task>.execution` e aplicado no runtime HTTP dos providers
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
-- suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
+- suíte atual: `python3 -m unittest -q` com `109` testes (`OK`)
+
+## Checkpoint final desta sessão
+
+- estado do worktree: limpo
+- branch atual: `main`
+- remoto: `origin/main` estava atrás e foi sincronizado depois dos últimos commits locais
+- ponto exato para retomar:
+  - avançar Fase 3 com execução multiestágio mais rica antes do provider
+  - definir se vale transformar a saída estruturada local em um estágio explícito do pipeline
+  - manter o padrão atual de confiabilidade, cache e diagnóstico como base estável
 
 ## Encerramento do dia
 
