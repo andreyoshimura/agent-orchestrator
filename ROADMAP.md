@@ -80,7 +80,12 @@
 - `[x]` criar um montador global de contexto por tarefa
 - `[x]` combinar bootstrap global + profile do projeto + memória + arquivos selecionados
 - `[x]` mover heurísticas de seleção/ranking para `app/core/`
-- `[ ]` permitir regras específicas por profile sem contaminar a camada global
+- `[x]` permitir regras específicas por profile sem contaminar a camada global
+  - `context_rules` em `project.yaml` agora suporta:
+    - `max_target_files`
+    - `task_file_limits`
+    - `task_queries`
+    - `pinned_files_by_task`
 
 ## Fase 3 - Execução real do fluxo
 

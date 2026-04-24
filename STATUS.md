@@ -85,6 +85,10 @@
     - hit quando os arquivos selecionados não mudam
     - miss automático quando o conteúdo do arquivo selecionado muda
   - bloco principal da `Fase 5` (confiabilidade) considerado fechado no estado atual do projeto local
+  - `context_rules` por profile agora estão ativos no `ContextBuilder` para customização por projeto sem acoplamento global
+    - limites por tarefa (`task_file_limits`)
+    - queries por tarefa (`task_queries`)
+    - arquivos priorizados por tarefa (`pinned_files_by_task`)
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
 - suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
 

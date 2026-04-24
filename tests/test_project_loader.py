@@ -15,6 +15,7 @@ class ProjectLoaderTest(unittest.TestCase):
         self.assertEqual(profile.repo_path_env, "AI_TARGET_REPO")
         self.assertIn("projects/ia-trade/memory/facts.md", profile.memory_files)
         self.assertIn("repo_worker", profile.prompt_files)
+        self.assertIsInstance(profile.context_rules, dict)
 
     def test_load_runtime_project_uses_profile_env_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -69,6 +70,26 @@ class ProjectLoaderTest(unittest.TestCase):
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO_ALT", old_target)
                 _restore_env("AI_REPO_WRITE_ENABLED_ALT", old_write)
+
+    def test_load_project_profile_reads_context_rules_from_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root = Path(tmpdir) / "profiles"
+            create_test_project_profile(
+                projects_root,
+                "demo",
+                context_rules={
+                    "max_target_files": 3,
+                    "task_file_limits": {"review-file": 2},
+                    "task_queries": {"review-file": ["engine"]},
+                    "pinned_files_by_task": {"review-file": ["engine.py"]},
+                },
+            )
+
+            profile = load_project_profile("demo", projects_root=str(projects_root))
+
+            self.assertEqual(profile.context_rules.get("max_target_files"), 3)
+            self.assertEqual(profile.context_rules.get("task_file_limits", {}).get("review-file"), 2)
+            self.assertEqual(profile.context_rules.get("task_queries", {}).get("review-file"), ["engine"])
 
 
 def _restore_env(name: str, value: str | None) -> None:

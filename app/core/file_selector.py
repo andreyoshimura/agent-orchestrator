@@ -131,6 +131,7 @@ def auto_select_python_files(
     objective: str = "",
     query: str = "",
     limit: int = 3,
+    task_limit_override: int | None = None,
 ) -> list[RankedFile]:
     files = collect_python_files(root)
     inferred_queries = infer_queries(task_type=task_type, objective=objective, query=query)
@@ -146,7 +147,7 @@ def auto_select_python_files(
 
     ranked = [RankedFile(file=file, score=score) for file, score in merged_scores.items() if score > 0]
     ranked.sort(key=lambda item: (-item.score, item.file))
-    task_limit = DEFAULT_TASK_LIMITS.get(task_type, limit)
+    task_limit = task_limit_override if task_limit_override is not None else DEFAULT_TASK_LIMITS.get(task_type, limit)
     constrained_limit = min(limit, task_limit)
     if _has_comparative_intent(task_type=task_type, objective=objective):
         return _trim_comparative_results(ranked, best_per_query, inferred_queries, constrained_limit)

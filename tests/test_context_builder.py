@@ -112,6 +112,86 @@ class ContextBuilderTest(unittest.TestCase):
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO_ALT", old_target)
 
+    def test_build_respects_profile_context_rules_for_task_limit_and_queries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root = Path(tmpdir) / "profiles"
+            create_test_project_profile(
+                projects_root,
+                "demo",
+                context_rules={
+                    "max_target_files": 4,
+                    "task_file_limits": {"review-file": 2},
+                    "task_queries": {"review-file": ["engine"]},
+                },
+            )
+
+            repo_root = Path(tmpdir) / "repo"
+            repo_root.mkdir()
+            (repo_root / "engine.py").write_text("print('engine')\n", encoding="utf-8")
+            (repo_root / "engine_service.py").write_text("print('service')\n", encoding="utf-8")
+            (repo_root / "other.py").write_text("print('other')\n", encoding="utf-8")
+
+            old_projects_root = os.environ.get("AI_PROJECTS_ROOT")
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO_ALT")
+            try:
+                os.environ["AI_PROJECTS_ROOT"] = str(projects_root)
+                os.environ["AI_DEFAULT_PROJECT"] = "demo"
+                os.environ["AI_TARGET_REPO_ALT"] = str(repo_root)
+
+                bundle = ContextBuilder(load_runtime_project()).build(
+                    task_type="review-file",
+                    payload={"objective": "Comparar engine e service"},
+                )
+
+                self.assertLessEqual(len(bundle.files), 2)
+                self.assertIn("engine.py", bundle.files)
+                self.assertIn("engine_service.py", bundle.files)
+                self.assertIn("TARGET_FILE::engine.py", bundle.sections)
+            finally:
+                _restore_env("AI_PROJECTS_ROOT", old_projects_root)
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO_ALT", old_target)
+
+    def test_build_prioritizes_pinned_files_from_profile_context_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root = Path(tmpdir) / "profiles"
+            create_test_project_profile(
+                projects_root,
+                "demo",
+                context_rules={
+                    "max_target_files": 2,
+                    "task_file_limits": {"review-file": 2},
+                    "task_queries": {"review-file": ["engine"]},
+                    "pinned_files_by_task": {"review-file": ["risk_manager.py"]},
+                },
+            )
+
+            repo_root = Path(tmpdir) / "repo"
+            repo_root.mkdir()
+            (repo_root / "engine.py").write_text("print('engine')\n", encoding="utf-8")
+            (repo_root / "risk_manager.py").write_text("print('risk')\n", encoding="utf-8")
+
+            old_projects_root = os.environ.get("AI_PROJECTS_ROOT")
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO_ALT")
+            try:
+                os.environ["AI_PROJECTS_ROOT"] = str(projects_root)
+                os.environ["AI_DEFAULT_PROJECT"] = "demo"
+                os.environ["AI_TARGET_REPO_ALT"] = str(repo_root)
+
+                bundle = ContextBuilder(load_runtime_project()).build(
+                    task_type="review-file",
+                    payload={"objective": "Revisar runtime"},
+                )
+
+                self.assertEqual(bundle.files[0], "risk_manager.py")
+                self.assertIn("TARGET_FILE::risk_manager.py", bundle.sections)
+            finally:
+                _restore_env("AI_PROJECTS_ROOT", old_projects_root)
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO_ALT", old_target)
+
     def test_build_deduplicates_explicit_files_and_respects_max_target_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "a.py").write_text("print('a')\n", encoding="utf-8")
