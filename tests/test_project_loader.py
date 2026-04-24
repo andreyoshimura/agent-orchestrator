@@ -91,6 +91,23 @@ class ProjectLoaderTest(unittest.TestCase):
             self.assertEqual(profile.context_rules.get("task_file_limits", {}).get("review-file"), 2)
             self.assertEqual(profile.context_rules.get("task_queries", {}).get("review-file"), ["engine"])
 
+    def test_load_project_profile_reads_task_prompt_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root = Path(tmpdir) / "profiles"
+            create_test_project_profile(
+                projects_root,
+                "demo",
+                task_prompt_overrides={
+                    "review-file": "repo_worker",
+                    "compare-options": "micro_reviewer",
+                },
+            )
+
+            profile = load_project_profile("demo", projects_root=str(projects_root))
+
+            self.assertEqual(profile.task_prompt_overrides.get("review-file"), "repo_worker")
+            self.assertEqual(profile.task_prompt_overrides.get("compare-options"), "micro_reviewer")
+
 
 def _restore_env(name: str, value: str | None) -> None:
     if value is None:

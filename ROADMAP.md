@@ -86,6 +86,7 @@
     - `task_file_limits`
     - `task_queries`
     - `pinned_files_by_task`
+  - `task_prompt_overrides` em `project.yaml` agora permite selecionar prompt/agente por `task_type` no profile
 
 ## Fase 3 - Execução real do fluxo
 

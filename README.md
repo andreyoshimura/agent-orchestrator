@@ -192,6 +192,7 @@ agent-orchestrator/
 - `AI_DEFAULT_PROJECT` seleciona o profile ativo do projeto
 - `AI_PROJECTS_ROOT` pode apontar para um diretório alternativo de profiles ao validar múltiplos projetos localmente
 - cada `projects/<project_id>/project.yaml` pode definir `context_rules` para customizar seleção de contexto por profile (`max_target_files`, `task_file_limits`, `task_queries`, `pinned_files_by_task`)
+- cada `projects/<project_id>/project.yaml` também pode definir `task_prompt_overrides` para mapear `task_type -> prompt/agente`
 
 ## Próximo passo
 

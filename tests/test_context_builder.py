@@ -192,6 +192,39 @@ class ContextBuilderTest(unittest.TestCase):
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO_ALT", old_target)
 
+    def test_build_uses_task_prompt_override_from_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root = Path(tmpdir) / "profiles"
+            create_test_project_profile(
+                projects_root,
+                "demo",
+                task_prompt_overrides={"review-file": "repo_worker"},
+            )
+
+            repo_root = Path(tmpdir) / "repo"
+            repo_root.mkdir()
+            (repo_root / "engine.py").write_text("print('engine')\n", encoding="utf-8")
+
+            old_projects_root = os.environ.get("AI_PROJECTS_ROOT")
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO_ALT")
+            try:
+                os.environ["AI_PROJECTS_ROOT"] = str(projects_root)
+                os.environ["AI_DEFAULT_PROJECT"] = "demo"
+                os.environ["AI_TARGET_REPO_ALT"] = str(repo_root)
+
+                bundle = ContextBuilder(load_runtime_project()).build(
+                    task_type="review-file",
+                    payload={"query": "engine"},
+                )
+
+                self.assertEqual(bundle.prompt_name, "repo_worker")
+                self.assertIn("You are the repo_worker agent.", bundle.prompt_text)
+            finally:
+                _restore_env("AI_PROJECTS_ROOT", old_projects_root)
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO_ALT", old_target)
+
     def test_build_deduplicates_explicit_files_and_respects_max_target_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "a.py").write_text("print('a')\n", encoding="utf-8")

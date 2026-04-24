@@ -89,6 +89,7 @@
     - limites por tarefa (`task_file_limits`)
     - queries por tarefa (`task_queries`)
     - arquivos priorizados por tarefa (`pinned_files_by_task`)
+  - `task_prompt_overrides` por profile agora permite escolher prompt/agente por tipo de tarefa sem alterar a camada global
   - agentes locais agora retornam saída estruturada (`local_agent_output`) além de prompt, e isso já entra no `local_plan` e no metadata do provider
   - `diagnose-orchestrator` agora expõe métricas de índice de cache (`cache_indexed_entry_count`, `cache_inspect_entry_count`) e chaves recentes de cache de inspeção
   - `TaskRunner` agora publica `execution_metrics` por execução (planejamento, tentativas de provider e tempo total), com persistência no `OperationalStore`

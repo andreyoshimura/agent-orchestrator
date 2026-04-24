@@ -154,6 +154,11 @@ class ContextBuilder:
         parts.append(f"## {section_name}\n{content}")
 
     def _prompt_name_for_task(self, task_type: str) -> str | None:
+        task_overrides = self.runtime_project.profile.task_prompt_overrides
+        if isinstance(task_overrides, dict):
+            overridden = task_overrides.get(task_type)
+            if isinstance(overridden, str) and overridden.strip():
+                return overridden.strip()
         if task_type in {"review-snippet", "review-diff", "review-file"}:
             return "micro_reviewer"
         if task_type in {"compare-options", "final-decision"}:

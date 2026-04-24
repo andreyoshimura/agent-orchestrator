@@ -7,6 +7,7 @@ def create_test_project_profile(
     repo_env: str = "AI_TARGET_REPO_ALT",
     write_env: str = "AI_REPO_WRITE_ENABLED_ALT",
     context_rules: dict | None = None,
+    task_prompt_overrides: dict | None = None,
 ) -> Path:
     project_dir = projects_root / project_id
     (project_dir / "memory").mkdir(parents=True, exist_ok=True)
@@ -79,6 +80,10 @@ def create_test_project_profile(
                 lines.append(f"    {task_type}:")
                 for path in files:
                     lines.append(f"      - {path}")
+    if task_prompt_overrides:
+        lines.append("task_prompt_overrides:")
+        for task_type, prompt_name in task_prompt_overrides.items():
+            lines.append(f"  {task_type}: {prompt_name}")
     lines.append("")
 
     (project_dir / "project.yaml").write_text(

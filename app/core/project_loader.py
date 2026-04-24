@@ -35,6 +35,7 @@ class ProjectProfile:
     agent_profile: str
     memory_files: list[str]
     prompt_files: Dict[str, str]
+    task_prompt_overrides: Dict[str, str]
     context_rules: Dict[str, Any]
     project_dir: Path
     raw_config: Dict[str, Any]
@@ -86,6 +87,7 @@ def load_project_profile(project_id: str | None = None, projects_root: str | Non
         agent_profile=str(config.get("agent_profile", "engineering")),
         memory_files=list(config.get("memory_files", [])),
         prompt_files=dict(config.get("prompt_files", {})),
+        task_prompt_overrides=dict(config.get("task_prompt_overrides", {})),
         context_rules=dict(config.get("context_rules", {})),
         project_dir=project_dir,
         raw_config=config,
