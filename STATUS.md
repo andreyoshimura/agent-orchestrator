@@ -78,6 +78,7 @@
   - `TaskRunner` ganhou reutilização opcional de cache (`allow_cache_reuse`) e `task_cli` ativa por padrão com `AI_CACHE_REUSE_ENABLED` (desligável)
   - o cache agora invalida por assinatura de conteúdo dos arquivos selecionados (hash + metadados), além do payload
   - `inspect-task` agora suporta cache com TTL (`AI_INSPECT_CACHE_REUSE_ENABLED` / `AI_INSPECT_CACHE_TTL_SEC`) e bypass por `"force_refresh": true`
+  - o cache do `inspect-task` agora também valida assinatura de conteúdo dos arquivos selecionados para evitar hit stale
   - `StateStore` e `CacheStore` agora usam gravação atômica (`temp file` + `replace`) para reduzir risco de corrupção em concorrência leve
   - cobertura de testes ampliada para leitura/escrita concorrente leve em storage local
   - cobertura E2E ampliada para cache do `task_cli`:

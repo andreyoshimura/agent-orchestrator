@@ -449,6 +449,61 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertEqual(refreshed["inspection"]["cache"]["hit"], False)
             self.assertEqual(second["inspection"]["local_plan"]["selected_files"], ["engine.py"])
 
+    def test_inspect_task_invalidates_cached_inspection_when_selected_file_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            engine_file = repo_root / "engine.py"
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_INSPECT_CACHE_REUSE_ENABLED": "true",
+                "AI_INSPECT_CACHE_TTL_SEC": "300",
+            }):
+                with patch("app.commands.inspect_task.CacheStore", return_value=cache_store):
+                    with patch.object(TaskRunner, "inspect") as mock_inspect:
+                        mock_inspect.side_effect = [
+                            {
+                                "task_type": "review-file",
+                                "payload": {"query": "engine"},
+                                "route": {"preferred": "claude", "fallbacks": []},
+                                "context": {"status": "ready", "target_repo": {"path": str(repo_root)}},
+                                "local_plan": {"selected_files": ["engine.py"]},
+                                "providers": [],
+                            },
+                            {
+                                "task_type": "review-file",
+                                "payload": {"query": "engine"},
+                                "route": {"preferred": "claude", "fallbacks": []},
+                                "context": {"status": "ready", "target_repo": {"path": str(repo_root)}},
+                                "local_plan": {"selected_files": ["engine.py"]},
+                                "providers": [],
+                            },
+                        ]
+                        first = _run_command(
+                            inspect_task.main,
+                            [
+                                "inspect_task.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+                        engine_file.write_text("print('engine v2')\n", encoding="utf-8")
+                        second = _run_command(
+                            inspect_task.main,
+                            [
+                                "inspect_task.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+
+            self.assertEqual(mock_inspect.call_count, 2)
+            self.assertEqual(first["inspection"]["cache"]["hit"], False)
+            self.assertEqual(second["inspection"]["cache"]["hit"], False)
+
     def test_inspect_then_task_cli_covers_fallback_and_persistence(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)

@@ -100,6 +100,7 @@
 - `[~]` criar comandos de diagnóstico do estado global do orchestrator
 - `[~]` reduzir recomputação de inspeção local
   - `inspect-task` agora suporta cache com TTL por payload e bypass via `force_refresh`
+  - cache de inspeção agora invalida automaticamente quando arquivos selecionados mudam
 - `[~]` reduzir dependência de wrappers manuais para tarefas recorrentes
   - aliases legados de arquivo explícito agora delegam para `inspect-task` / `assemble-context`
   - aliases legados de seleção Python agora delegam para `inspect-task` / `assemble-context`

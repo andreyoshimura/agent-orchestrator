@@ -95,6 +95,7 @@ set -a && source .env && set +a
 - `AI_CACHE_REUSE_ENABLED=true` (default no `task_cli`) reutiliza resultado de payload idêntico; use `false` para desativar globalmente
 - `AI_INSPECT_CACHE_REUSE_ENABLED=true` (default no `inspect-task`) reutiliza inspeções repetidas por payload
 - `AI_INSPECT_CACHE_TTL_SEC=30` controla TTL do cache de inspeção em segundos
+- o cache de `inspect-task` também invalida quando o conteúdo dos arquivos selecionados muda
 
 ### 2. Retomar sessão
 
