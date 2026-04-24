@@ -34,6 +34,7 @@ class OperationalStore:
             "provider": output.get("provider_result", {}).get("provider"),
             "status": output.get("provider_result", {}).get("status"),
             "provider_attempts": output.get("provider_attempts", []),
+            "execution_metrics": output.get("execution_metrics", {}),
         }
         cache_payload = {
             "task_type": task_type,
@@ -50,6 +51,7 @@ class OperationalStore:
                 "provider": output.get("provider_result", {}).get("provider"),
                 "status": output.get("provider_result", {}).get("status"),
                 "provider_attempts": output.get("provider_attempts", []),
+                "execution_metrics": output.get("execution_metrics", {}),
             },
         }
 

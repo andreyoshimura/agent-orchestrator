@@ -125,6 +125,10 @@ class TaskRunnerTest(unittest.TestCase):
                     result.output["provider_result"]["output"]["metadata"]["local_agent_output"]["agent"],
                     "micro_reviewer",
                 )
+                self.assertIn("execution_metrics", result.output)
+                self.assertEqual(result.output["execution_metrics"]["cache_hit"], False)
+                self.assertGreaterEqual(result.output["execution_metrics"]["planning_ms"], 0)
+                self.assertGreaterEqual(result.output["execution_metrics"]["total_ms"], 0)
                 self.assertEqual(result.output["provider_attempts"][0]["provider"], "claude")
                 self.assertEqual(result.output["provider_attempts"][0]["attempt"], 1)
                 self.assertEqual(result.output["provider_attempts"][0]["status"], "stub")
@@ -173,6 +177,7 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(second.status, "stub")
                 self.assertEqual(mock_execute_provider.call_count, 1)
                 self.assertEqual(second.output["cache"]["hit"], True)
+                self.assertEqual(second.output["execution_metrics"]["cache_hit"], True)
                 self.assertIn("provider_attempts", second.output)
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)

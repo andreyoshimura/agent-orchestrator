@@ -91,6 +91,7 @@
     - arquivos priorizados por tarefa (`pinned_files_by_task`)
   - agentes locais agora retornam saída estruturada (`local_agent_output`) além de prompt, e isso já entra no `local_plan` e no metadata do provider
   - `diagnose-orchestrator` agora expõe métricas de índice de cache (`cache_indexed_entry_count`, `cache_inspect_entry_count`) e chaves recentes de cache de inspeção
+  - `TaskRunner` agora publica `execution_metrics` por execução (planejamento, tentativas de provider e tempo total), com persistência no `OperationalStore`
   - cobertura E2E ampliada para sequência `inspect-task -> task_cli` com degradação + fallback + persistência
 - suíte atual: `python3 -m unittest -q` com `94` testes (`OK`)
 

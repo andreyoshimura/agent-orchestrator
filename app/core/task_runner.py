@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
+import time
 from typing import Dict, Optional
 
 from app.core.context_builder import ContextBuilder
@@ -52,9 +53,11 @@ class TaskRunner:
         self.allow_cache_reuse = allow_cache_reuse
 
     def run(self, request: TaskRequest, estimated_cost: float = 0.0) -> TaskResult:
+        run_started_at = time.perf_counter()
         decision = self.router.decide(request.task_type)
         project_id = str(request.payload.get("project_id", "unknown"))
         planning = self._build_context_info(request)
+        planning_ms = _elapsed_ms(run_started_at)
         context_info = planning["context"]
         local_plan = planning["local_plan"]
         local_plan_object = planning["local_plan_object"]
@@ -71,6 +74,12 @@ class TaskRunner:
             if cached_result:
                 output = {
                     **cached_result["output"],
+                    "execution_metrics": {
+                        "cache_hit": True,
+                        "planning_ms": planning_ms,
+                        "provider_execution_ms": 0,
+                        "total_ms": _elapsed_ms(run_started_at),
+                    },
                     "cache": {"hit": True, "cache_key": cached_result["cache_key"]},
                 }
                 return TaskResult(
@@ -80,6 +89,7 @@ class TaskRunner:
                     output=output,
                 )
         attempted_providers = []
+        attempt_metrics: list[Dict[str, object]] = []
         chosen_provider: Optional[str] = None
         provider_result: Dict[str, object] | None = None
 
@@ -93,7 +103,7 @@ class TaskRunner:
                 })
                 continue
 
-            current_result, provider_attempts, should_continue_to_fallback = self._run_provider_with_retry(
+            current_result, provider_attempts, provider_attempt_metrics, should_continue_to_fallback = self._run_provider_with_retry(
                 provider_name=provider_name,
                 request=request,
                 local_plan_object=local_plan_object,
@@ -103,6 +113,7 @@ class TaskRunner:
                 fallback_on=decision.fallback_on,
             )
             attempted_providers.extend(provider_attempts)
+            attempt_metrics.extend(provider_attempt_metrics)
             provider_result = current_result
 
             if should_accept_provider_result(current_result["status"]):
@@ -123,6 +134,12 @@ class TaskRunner:
                     **dependency_artifacts,
                     "provider_attempts": attempted_providers,
                     "provider_result": provider_result,
+                    "execution_metrics": _execution_metrics(
+                        planning_ms=planning_ms,
+                        run_started_at=run_started_at,
+                        attempt_metrics=attempt_metrics,
+                        cache_hit=False,
+                    ),
                     "cache": {"hit": False},
                 },
             )
@@ -140,6 +157,12 @@ class TaskRunner:
                 **dependency_artifacts,
                 "provider_result": provider_result,
                 "provider_attempts": attempted_providers,
+                "execution_metrics": _execution_metrics(
+                    planning_ms=planning_ms,
+                    run_started_at=run_started_at,
+                    attempt_metrics=attempt_metrics,
+                    cache_hit=False,
+                ),
                 "cache": {"hit": False},
             },
         )
@@ -323,17 +346,20 @@ class TaskRunner:
         estimated_cost: float,
         max_provider_retries: int,
         fallback_on: list[str],
-    ) -> tuple[Dict[str, object], list[Dict[str, object]], bool]:
+    ) -> tuple[Dict[str, object], list[Dict[str, object]], list[Dict[str, object]], bool]:
         attempts: list[Dict[str, object]] = []
+        attempt_metrics: list[Dict[str, object]] = []
         current_result: Dict[str, object] | None = None
 
         for attempt_index in range(max_provider_retries + 1):
+            attempt_started_at = time.perf_counter()
             current_result = self._execute_provider(
                 provider_name=provider_name,
                 request=request,
                 local_plan=local_plan_object,
                 context_info=context_info,
             )
+            attempt_duration_ms = _elapsed_ms(attempt_started_at)
             failure_type = classify_provider_failure(current_result["status"], current_result.get("output"))
             if self._should_record_cost(current_result["status"], current_result.get("output"), estimated_cost):
                 self.budget_manager.record(provider_name, estimated_cost)
@@ -343,19 +369,26 @@ class TaskRunner:
                 "status": current_result["status"],
                 "failure_type": failure_type,
             })
+            attempt_metrics.append({
+                "provider": provider_name,
+                "attempt": attempt_index + 1,
+                "status": current_result["status"],
+                "failure_type": failure_type,
+                "duration_ms": attempt_duration_ms,
+            })
 
             if should_accept_provider_result(current_result["status"]):
-                return current_result, attempts, False
+                return current_result, attempts, attempt_metrics, False
             if attempt_index < max_provider_retries and should_retry_provider(current_result["status"], current_result.get("output")):
                 continue
-            return current_result, attempts, should_try_fallback(
+            return current_result, attempts, attempt_metrics, should_try_fallback(
                 current_result["status"],
                 current_result.get("output"),
                 fallback_on=fallback_on,
             )
 
         assert current_result is not None
-        return current_result, attempts, False
+        return current_result, attempts, attempt_metrics, False
 
     def _should_record_cost(self, status: object, output: Dict[str, object] | None, estimated_cost: float) -> bool:
         if estimated_cost <= 0:
@@ -456,3 +489,27 @@ class TaskRunner:
                 }
             )
         return fingerprints
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
+
+
+def _execution_metrics(
+    planning_ms: int,
+    run_started_at: float,
+    attempt_metrics: list[Dict[str, object]],
+    cache_hit: bool,
+) -> Dict[str, object]:
+    provider_execution_ms = sum(
+        int(item.get("duration_ms", 0))
+        for item in attempt_metrics
+        if isinstance(item, dict)
+    )
+    return {
+        "cache_hit": cache_hit,
+        "planning_ms": planning_ms,
+        "provider_execution_ms": provider_execution_ms,
+        "total_ms": _elapsed_ms(run_started_at),
+        "attempt_metrics": attempt_metrics,
+    }

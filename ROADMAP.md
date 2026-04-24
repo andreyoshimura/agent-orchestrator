@@ -90,6 +90,8 @@
 ## Fase 3 - Execução real do fluxo
 
 - `[~]` transformar `TaskRunner` em executor real de pipeline
+  - `TaskRunner.run` agora publica `execution_metrics` (`planning_ms`, `provider_execution_ms`, `total_ms`, `attempt_metrics`, `cache_hit`)
+  - `OperationalStore` persiste `execution_metrics` no estado e no resumo de cache
 - `[~]` conectar agentes ao carregamento de prompts e memória do projeto
   - `build_local_task_plan` agora retorna `local_agent_output` estruturado por agente (`repo_worker`, `micro_reviewer`, `arbiter`)
   - `TaskRunner` repassa `local_agent_output` no plano local e no metadata enviado ao provider

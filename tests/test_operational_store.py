@@ -39,6 +39,8 @@ class OperationalStoreTest(unittest.TestCase):
             self.assertEqual(state_payload["task_type"], "review-file")
             self.assertEqual(state_payload["selected_files"], ["paper_trade.py"])
             self.assertEqual(cache_payload["summary"]["provider"], "gemini")
+            self.assertIn("execution_metrics", state_payload)
+            self.assertIn("execution_metrics", cache_payload["summary"])
 
     def test_persist_task_result_handles_degraded_output_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
