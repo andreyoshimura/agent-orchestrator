@@ -93,6 +93,8 @@ set -a && source .env && set +a
 - preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
 - use `OPENAI_API_BASE`, `GEMINI_API_BASE` e `CLAUDE_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
 - `AI_CACHE_REUSE_ENABLED=true` (default no `task_cli`) reutiliza resultado de payload idêntico; use `false` para desativar globalmente
+- `AI_INSPECT_CACHE_REUSE_ENABLED=true` (default no `inspect-task`) reutiliza inspeções repetidas por payload
+- `AI_INSPECT_CACHE_TTL_SEC=30` controla TTL do cache de inspeção em segundos
 
 ### 2. Retomar sessão
 
@@ -114,6 +116,7 @@ bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objecti
 ```
 
 - `inspect-task` é o entrypoint principal para entender rota, arquivos selecionados, prompt e disponibilidade de providers
+- `inspect-task` suporta cache de inspeção com TTL para reduzir recomputação em chamadas repetidas; use `"force_refresh": true` no payload para bypass
 - `assemble-context` é o entrypoint principal para conferir o contexto bruto montado pelo orchestrator
 - para `map-dependencies`, ambos também retornam `dependency_map` quando houver arquivo Python selecionado
   - `dependency_map` inclui imports, símbolos, chamadas, `call_relations` priorizadas (`relation_score`/`relation_priority`/`relation_rank`), resumo executivo (`call_relation_summary`) com `risk_flags`, e resolução básica de imports locais para arquivos candidatos no repo

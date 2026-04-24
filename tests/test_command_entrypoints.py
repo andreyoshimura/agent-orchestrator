@@ -309,6 +309,59 @@ class CommandEntrypointsTest(unittest.TestCase):
         self.assertEqual(payload["inspection"]["context"]["status"], "partial")
         self.assertEqual(payload["inspection"]["context"]["reason"], "target repo not configured")
 
+    def test_inspect_task_reuses_cached_inspection_within_ttl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            mocked_inspection = {
+                "task_type": "review-file",
+                "payload": {"query": "engine"},
+                "route": {"preferred": "claude", "fallbacks": []},
+                "context": {"status": "ready"},
+                "local_plan": {"selected_files": ["engine.py"]},
+                "providers": [],
+            }
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_INSPECT_CACHE_REUSE_ENABLED": "true",
+                "AI_INSPECT_CACHE_TTL_SEC": "300",
+            }):
+                with patch("app.commands.inspect_task.CacheStore", return_value=cache_store):
+                    with patch.object(TaskRunner, "inspect", return_value=mocked_inspection) as mock_inspect:
+                        first = _run_command(
+                            inspect_task.main,
+                            [
+                                "inspect_task.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+                        second = _run_command(
+                            inspect_task.main,
+                            [
+                                "inspect_task.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime"}),
+                            ],
+                        )
+                        refreshed = _run_command(
+                            inspect_task.main,
+                            [
+                                "inspect_task.py",
+                                "review-file",
+                                json.dumps({"query": "engine", "objective": "Revisar engine runtime", "force_refresh": True}),
+                            ],
+                        )
+
+            self.assertEqual(mock_inspect.call_count, 2)
+            self.assertEqual(first["inspection"]["cache"]["hit"], False)
+            self.assertEqual(second["inspection"]["cache"]["hit"], True)
+            self.assertEqual(refreshed["inspection"]["cache"]["hit"], False)
+            self.assertEqual(second["inspection"]["local_plan"]["selected_files"], ["engine.py"])
+
     def test_inspect_then_task_cli_covers_fallback_and_persistence(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)
