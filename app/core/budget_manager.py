@@ -19,6 +19,12 @@ class BudgetStatus:
     def available(self) -> bool:
         return self.remaining > 0
 
+    @property
+    def remaining_ratio(self) -> float:
+        if self.limit <= 0:
+            return 0.0
+        return max(min(self.remaining / self.limit, 1.0), 0.0)
+
 
 class BudgetManager:
     def __init__(
@@ -56,6 +62,7 @@ class BudgetManager:
                     "limit": self.status(provider).limit,
                     "remaining": self.status(provider).remaining,
                     "available": self.status(provider).available,
+                    "remaining_ratio": self.status(provider).remaining_ratio,
                 }
                 for provider in sorted(self.daily_limits)
             },

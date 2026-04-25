@@ -28,6 +28,9 @@
 - aumentar autonomia do fluxo local
 - evoluir o core sem acoplar o orchestrator ao profile `ia-trade`
 - consolidar aliases legados sobre `inspect-task` / `assemble-context`
+- seleção dinâmica de provedor/modelo com consulta ao `BudgetManager` já está ativa no `TaskRunner`
+- a troca agora é proativa, com threshold configurável por tarefa, por exemplo `gemini-3-flash-preview -> gemini-3.1-flash-lite-preview` quando o `Flash` estiver perto do limite
+- manter a lista de fallbacks configurada por tarefa como fonte de ordem preferencial, sem mexer na estrutura do pipeline
 - ampliar cobertura de testes para ranking e montagem de contexto no core
 - ampliar cobertura de confiabilidade para `TaskRunner` e persistência operacional
 - evitar consumo indevido de budget quando provider não executa de fato
@@ -53,19 +56,23 @@
   - execução padronizada de providers
   - fallback real entre providers
   - retry curto configurável por tarefa
+  - seleção proativa de provider/modelo por budget headroom, com threshold por tarefa
+  - `inspect-task` agora também expõe `selection_preview` para mostrar quando a troca proativa vai acontecer
   - persistência operacional básica em `var/state` e `var/cache`
   - persistência diária de orçamento por provider em `var/state`
   - inspeção genérica de rota/plano/contexto para qualquer tarefa
   - suporte a `AI_PROJECTS_ROOT` para validar múltiplos profiles
   - testes cobrindo profile alternativo além de `ia-trade`
-- o próximo passo recomendado ao retomar é:
-  - consolidar cenários restantes de confiabilidade no core (principalmente fluxos de comparação estrutural)
-  - manter cobertura explícita para profile inválido, payload inválido e execução com target repo não configurado
-  - revisar política de invalidação de cache em casos de arquivos não selecionados, mas semanticamente relevantes
+- o ponto em aberto para a próxima sessão é revisar se vale refinar o threshold por profile ou por task-type quando aparecerem métricas reais de uso
+- o ponto em aberto para a próxima sessão também inclui considerar métricas explícitas de consumo por modelo/tarefa se quisermos aproximar melhor o caso `tokens` além de budget
+- o próximo passo recomendado ao retomar é consolidar cenários restantes de confiabilidade no core (principalmente fluxos de comparação estrutural)
+- o próximo passo recomendado ao retomar também é manter cobertura explícita para profile inválido, payload inválido e execução com target repo não configurado
+- o próximo passo recomendado ao retomar também é revisar a política de invalidação de cache em casos de arquivos não selecionados, mas semanticamente relevantes
 
 ## Atualização de continuidade
 
 - data da retomada: `2026-04-24`
+- checkpoint desta sessão: fallback proativo por budget headroom implementado no `TaskRunner`, com threshold configurável por tarefa e preservando retry/fallback atuais
 - bloco concluído nesta sessão:
   - runtime de providers generalizado para múltiplas contas por adapter (`type` em `config/providers.yaml` + fallback por prefixo `<provider>_...`)
   - suporte explícito a `gemini_v2` no config/env/budget com reaproveitamento do adapter `gemini`
@@ -76,6 +83,9 @@
   - `TaskRunner.inspect` e `TaskRunner.run` agora incluem `dependency_map` + `dependency_highlights` para `map-dependencies` no fluxo genérico
   - `inspect-task` deixou de ter lógica dedicada para `map-dependencies`, consumindo o caminho genérico do runner
   - `routing.yaml` passou a declarar `review-file` explicitamente e ampliou fallback de `map-dependencies` para `claude` + `openai`
+  - `TaskRunner` agora seleciona provider/modelo de forma proativa por headroom de budget, com `budget_switch_threshold_ratio` por tarefa
+  - `inspect-task` agora mostra um `selection_preview` direto, com a decisão de manter o primário ou trocar para fallback antes da execução
+  - `diagnose-orchestrator` agora expõe `proactive_switch_telemetry` com contagem diária de trocas antecipadas
   - `OperationalStore` agora persiste snapshot do resultado e permite lookup por fingerprint (`load_cached_task_result`)
   - `TaskRunner` ganhou reutilização opcional de cache (`allow_cache_reuse`) e `task_cli` ativa por padrão com `AI_CACHE_REUSE_ENABLED` (desligável)
   - o cache agora invalida por assinatura de conteúdo dos arquivos selecionados (hash + metadados), além do payload

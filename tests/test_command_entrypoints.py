@@ -525,6 +525,44 @@ class CommandEntrypointsTest(unittest.TestCase):
                 ],
             )
 
+    def test_diagnose_orchestrator_reports_proactive_switch_telemetry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"proactive_switch_metrics_{date.today().isoformat()}",
+                {
+                    "date": date.today().isoformat(),
+                    "total_switches": 2,
+                    "by_task_type": {"review-file": 2},
+                    "by_primary_provider": {"gemini": 2},
+                    "by_fallback_provider": {"claude": 2},
+                    "by_route": {"gemini->claude": 2},
+                    "last_event": {
+                        "task_type": "review-file",
+                        "primary_provider": "gemini",
+                        "fallback_provider": "claude",
+                    },
+                },
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py"],
+                        )
+
+            self.assertEqual(payload["storage"]["proactive_switch_telemetry"]["total_switches"], 2)
+            self.assertEqual(payload["storage"]["proactive_switch_telemetry"]["by_route"], {"gemini->claude": 2})
+            self.assertEqual(payload["storage"]["proactive_switch_telemetry"]["last_event"]["fallback_provider"], "claude")
+
     def test_diagnose_orchestrator_uses_default_budget_alert_threshold_when_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)
@@ -906,6 +944,8 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertIn("gemini", inspection["inspection"]["route"]["fallbacks"])
             self.assertEqual(execution["status"], "stub")
             self.assertEqual(execution["provider"], "gemini")
+            self.assertIn("selection_preview", execution["output"])
+            self.assertEqual(execution["output"]["selection_preview"]["strategy"], "standard_route")
             self.assertEqual(
                 execution["output"]["provider_attempts"],
                 [

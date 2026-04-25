@@ -71,6 +71,9 @@
 - próximo bloco a implementar:
   - redução adicional de wrappers manuais ainda restantes
   - ampliar confiabilidade operacional do fluxo completo
+  - plugar seleção dinâmica de provedor/modelo no `TaskRunner`, consultando `BudgetManager` antes de cada tentativa para trocar automaticamente quando o primário estourar orçamento ou limite de tokens
+  - deixar essa troca proativa, no estilo `Flash -> Flash Lite`, antes do erro de quota/budget
+  - preservar a ordem configurada de fallbacks por tarefa como base da decisão
   - payload JSON inválido agora retorna erro estruturado nos entrypoints genéricos
   - profile inválido agora retorna erro estruturado nos entrypoints genéricos
   - execução com target repo não configurado agora está coberta nos testes de entrypoint
@@ -112,6 +115,7 @@
 - `[x]` padronizar interface de providers além do status `stub`
 - `[x]` permitir múltiplas contas por adapter sem novo código (mapeamento `type` + resolução por prefixo em nomes `<provider>_...`)
 - `[~]` adicionar fallback real entre providers
+- próximo ajuste: tornar a troca entre providers sensível ao orçamento disponível por tentativa, com troca antecipada de modelo quando o primário estiver perto do limite, sem refatorar a estrutura do pipeline
 - `[~]` externalizar retry/fallback policy para configuração por tarefa
   - `provider_timeout_sec` por tarefa agora está disponível no `routing.<task>.execution` e aplicado no runtime de providers
 

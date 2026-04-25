@@ -109,6 +109,12 @@ class TaskRunner:
         local_analysis = planning["local_analysis"]
         dependency_artifacts = self._dependency_artifacts(request, local_plan, context_info=context_info)
         cache_context = self._build_cache_context(local_plan, context_info)
+        candidate_providers = [decision.provider, *decision.fallbacks]
+        selection_preview = self._build_selection_preview(
+            providers=candidate_providers,
+            estimated_cost=estimated_cost,
+            threshold_ratio=decision.budget_switch_threshold_ratio,
+        )
 
         if self.allow_cache_reuse and not bool(request.payload.get("force_refresh")):
             cached_result = self.operational_store.load_cached_task_result(
@@ -140,6 +146,9 @@ class TaskRunner:
                 )
                 output = {
                     **cached_result["output"],
+                    "selection_preview": cached_result["output"].get("selection_preview")
+                    if isinstance(cached_result["output"], dict) and isinstance(cached_result["output"].get("selection_preview"), dict)
+                    else selection_preview,
                     "synthesis": cached_result["output"].get("synthesis")
                     if isinstance(cached_result["output"], dict) and isinstance(cached_result["output"].get("synthesis"), dict)
                     else self._synthesize_result_summary(
@@ -173,13 +182,27 @@ class TaskRunner:
         provider_result: Dict[str, object] | None = None
 
         provider_started_at = time.perf_counter()
-        for provider_name in [decision.provider, *decision.fallbacks]:
+        for provider_index, provider_name in enumerate(candidate_providers):
             if not self._provider_usable(provider_name, estimated_cost):
                 attempted_providers.append({
                     "provider": provider_name,
                     "attempt": 0,
                     "status": "skipped",
                     "reason": "provider unavailable within current settings or budget",
+                })
+                continue
+
+            if self._should_defer_provider(
+                provider_name=provider_name,
+                remaining_candidates=candidate_providers[provider_index + 1:],
+                estimated_cost=estimated_cost,
+                threshold_ratio=decision.budget_switch_threshold_ratio,
+            ):
+                attempted_providers.append({
+                    "provider": provider_name,
+                    "attempt": 0,
+                    "status": "skipped",
+                    "reason": "provider below proactive budget threshold",
                 })
                 continue
 
@@ -225,6 +248,7 @@ class TaskRunner:
                     "local_plan": local_plan,
                     "local_analysis": local_analysis,
                     **dependency_artifacts,
+                    "selection_preview": selection_preview,
                     "provider_attempts": attempted_providers,
                     "provider_result": provider_result,
                     "synthesis": self._synthesize_result_summary(
@@ -261,6 +285,7 @@ class TaskRunner:
                 "local_plan": local_plan,
                 "local_analysis": local_analysis,
                 **dependency_artifacts,
+                "selection_preview": selection_preview,
                 "provider_result": provider_result,
                 "provider_attempts": attempted_providers,
                 "synthesis": self._synthesize_result_summary(
@@ -313,6 +338,7 @@ class TaskRunner:
                     "max_provider_retries": invalid_decision.max_provider_retries,
                     "fallback_on": invalid_decision.fallback_on,
                     "provider_timeout_sec": invalid_decision.provider_timeout_sec,
+                    "budget_switch_threshold_ratio": invalid_decision.budget_switch_threshold_ratio,
                 },
                 "context": {"status": "unavailable", "reason": "payload must be an object"},
                 "context_sufficiency": {
@@ -374,9 +400,15 @@ class TaskRunner:
                     "limit": budget_status.limit,
                     "remaining": budget_status.remaining,
                     "available": budget_status.available,
+                    "remaining_ratio": budget_status.remaining_ratio,
                 },
                 "usable_for_estimated_cost": self._provider_usable(provider_name, estimated_cost),
             })
+        selection_preview = self._build_selection_preview(
+            providers=providers,
+            estimated_cost=estimated_cost,
+            threshold_ratio=decision.budget_switch_threshold_ratio,
+        )
 
         inspection = {
             "task_type": request.task_type,
@@ -387,7 +419,9 @@ class TaskRunner:
                 "max_provider_retries": decision.max_provider_retries,
                 "fallback_on": decision.fallback_on,
                 "provider_timeout_sec": decision.provider_timeout_sec,
+                "budget_switch_threshold_ratio": decision.budget_switch_threshold_ratio,
             },
+            "selection_preview": selection_preview,
             "context": planning["context"],
             "context_sufficiency": planning["context_sufficiency"],
             "local_plan": planning["local_plan"],
@@ -619,6 +653,96 @@ class TaskRunner:
         if settings is not None and not settings.enabled:
             return False
         return self.budget_manager.can_use(provider_name, estimated_cost)
+
+    def _should_defer_provider(
+        self,
+        provider_name: str,
+        remaining_candidates: list[str],
+        estimated_cost: float,
+        threshold_ratio: float,
+    ) -> bool:
+        if threshold_ratio <= 0:
+            return False
+
+        status = self.budget_manager.status(provider_name)
+        if status.limit <= 0 or status.remaining <= 0:
+            return False
+        if status.remaining_ratio > threshold_ratio:
+            return False
+
+        for fallback_name in remaining_candidates:
+            if not self._provider_usable(fallback_name, estimated_cost):
+                continue
+            fallback_status = self.budget_manager.status(fallback_name)
+            if fallback_status.remaining_ratio > threshold_ratio:
+                return True
+        return False
+
+    def _build_selection_preview(
+        self,
+        providers: list[str],
+        estimated_cost: float,
+        threshold_ratio: float,
+    ) -> Dict[str, object]:
+        if not providers:
+            return {
+                "strategy": "unavailable",
+                "decision": "none",
+                "reason": "no providers configured",
+            }
+
+        primary = providers[0]
+        primary_status = self.budget_manager.status(primary)
+        viable_fallback = None
+        for fallback_name in providers[1:]:
+            if not self._provider_usable(fallback_name, estimated_cost):
+                continue
+            fallback_status = self.budget_manager.status(fallback_name)
+            viable_fallback = {
+                "provider": fallback_name,
+                "remaining": fallback_status.remaining,
+                "remaining_ratio": fallback_status.remaining_ratio,
+            }
+            break
+
+        if primary_status.limit > 0 and primary_status.remaining > 0 and primary_status.remaining_ratio <= threshold_ratio and viable_fallback is not None:
+            return {
+                "strategy": "proactive_budget_switch",
+                "decision": "switch_now_due_to_budget",
+                "primary_provider": primary,
+                "primary_remaining": primary_status.remaining,
+                "primary_remaining_ratio": primary_status.remaining_ratio,
+                "threshold_ratio": threshold_ratio,
+                "selected_fallback": viable_fallback,
+                "reason": (
+                    f"primary provider {primary} is below proactive budget threshold; "
+                    f"switching to fallback {viable_fallback['provider']} before quota exhaustion"
+                ),
+            }
+
+        if primary_status.limit > 0 and primary_status.remaining > 0 and primary_status.remaining_ratio <= threshold_ratio:
+            return {
+                "strategy": "proactive_budget_switch",
+                "decision": "defer_switch_no_viable_fallback",
+                "primary_provider": primary,
+                "primary_remaining": primary_status.remaining,
+                "primary_remaining_ratio": primary_status.remaining_ratio,
+                "threshold_ratio": threshold_ratio,
+                "reason": (
+                    f"primary provider {primary} is below proactive budget threshold, "
+                    "but no fallback with enough headroom is available"
+                ),
+            }
+
+        return {
+            "strategy": "standard_route",
+            "decision": "keep_primary",
+            "primary_provider": primary,
+            "primary_remaining": primary_status.remaining,
+            "primary_remaining_ratio": primary_status.remaining_ratio,
+            "threshold_ratio": threshold_ratio,
+            "reason": "primary provider remains above proactive switch threshold",
+        }
 
     def _run_provider_with_retry(
         self,

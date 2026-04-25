@@ -10,6 +10,7 @@ class RouteDecision:
     max_provider_retries: int
     fallback_on: List[str]
     provider_timeout_sec: int
+    budget_switch_threshold_ratio: float
 
 
 class Router:
@@ -26,6 +27,11 @@ class Router:
         max_provider_retries = int(execution.get("max_provider_retries", 1))
         fallback_on = list(execution.get("fallback_on", ["temporary", "rate_limit", "network", "configuration", "provider_unavailable"]))
         provider_timeout_sec = int(execution.get("provider_timeout_sec", 30))
+        budget_switch_threshold_ratio = float(execution.get("budget_switch_threshold_ratio", 0.25))
+        if budget_switch_threshold_ratio < 0:
+            budget_switch_threshold_ratio = 0.0
+        if budget_switch_threshold_ratio > 1:
+            budget_switch_threshold_ratio = 1.0
         return RouteDecision(
             task_type=task_type,
             provider=provider,
@@ -33,4 +39,5 @@ class Router:
             max_provider_retries=max_provider_retries,
             fallback_on=fallback_on,
             provider_timeout_sec=provider_timeout_sec,
+            budget_switch_threshold_ratio=budget_switch_threshold_ratio,
         )

@@ -1,5 +1,6 @@
 import json
 from hashlib import sha256
+from datetime import date
 from typing import Any, Dict
 
 from app.storage.cache_store import CacheStore
@@ -57,6 +58,7 @@ class OperationalStore:
 
         self.state_store.save(state_key, state_payload)
         self.cache_store.set(cache_key, json.dumps(cache_payload, ensure_ascii=False, indent=2))
+        self._record_proactive_switch_telemetry(task_type=task_type, output=output)
         return {
             "state_key": state_key,
             "cache_key": cache_key,
@@ -99,6 +101,18 @@ class OperationalStore:
             "output": output,
         }
 
+    def proactive_switch_summary(self, current_date: str | None = None) -> Dict[str, Any]:
+        telemetry = self._load_proactive_switch_telemetry(current_date=current_date)
+        return {
+            "date": telemetry.get("date", current_date or date.today().isoformat()),
+            "total_switches": int(telemetry.get("total_switches", 0)),
+            "by_task_type": telemetry.get("by_task_type", {}),
+            "by_primary_provider": telemetry.get("by_primary_provider", {}),
+            "by_fallback_provider": telemetry.get("by_fallback_provider", {}),
+            "by_route": telemetry.get("by_route", {}),
+            "last_event": telemetry.get("last_event"),
+        }
+
     def cache_key(
         self,
         task_type: str,
@@ -132,6 +146,63 @@ class OperationalStore:
         )
         return sha256(fingerprint_payload.encode("utf-8")).hexdigest()
 
+    def _record_proactive_switch_telemetry(self, task_type: str, output: Dict[str, Any]) -> None:
+        selection_preview = output.get("selection_preview", {})
+        if not isinstance(selection_preview, dict):
+            return
+        if selection_preview.get("decision") != "switch_now_due_to_budget":
+            return
+
+        primary_provider = str(selection_preview.get("primary_provider", "")).strip()
+        selected_fallback = selection_preview.get("selected_fallback", {})
+        fallback_provider = ""
+        if isinstance(selected_fallback, dict):
+            fallback_provider = str(selected_fallback.get("provider", "")).strip()
+        if not primary_provider or not fallback_provider:
+            return
+
+        telemetry = self._load_proactive_switch_telemetry()
+        telemetry["date"] = self._current_date()
+        telemetry["total_switches"] = int(telemetry.get("total_switches", 0)) + 1
+        telemetry["by_task_type"] = _increment_counter(telemetry.get("by_task_type", {}), task_type)
+        telemetry["by_primary_provider"] = _increment_counter(telemetry.get("by_primary_provider", {}), primary_provider)
+        telemetry["by_fallback_provider"] = _increment_counter(telemetry.get("by_fallback_provider", {}), fallback_provider)
+        telemetry["by_route"] = _increment_counter(
+            telemetry.get("by_route", {}),
+            f"{primary_provider}->{fallback_provider}",
+        )
+        telemetry["last_event"] = {
+            "task_type": task_type,
+            "primary_provider": primary_provider,
+            "fallback_provider": fallback_provider,
+        }
+        self.state_store.save(self._proactive_switch_key(), telemetry)
+
+    def _load_proactive_switch_telemetry(self, current_date: str | None = None) -> Dict[str, Any]:
+        key = self._proactive_switch_key(current_date=current_date)
+        payload = self.state_store.load(key)
+        return payload if isinstance(payload, dict) else {}
+
+    def _proactive_switch_key(self, current_date: str | None = None) -> str:
+        return f"proactive_switch_metrics_{current_date or self._current_date()}"
+
+    def _current_date(self) -> str:
+        return date.today().isoformat()
+
 
 def _slug(value: str) -> str:
     return value.replace("-", "_").replace("/", "_")
+
+
+def _increment_counter(container: Any, key: str) -> Dict[str, int]:
+    if not isinstance(container, dict):
+        container = {}
+    counts: Dict[str, int] = {}
+    for existing_key, existing_value in container.items():
+        if isinstance(existing_key, str):
+            try:
+                counts[existing_key] = int(existing_value)
+            except (TypeError, ValueError):
+                counts[existing_key] = 0
+    counts[key] = counts.get(key, 0) + 1
+    return counts

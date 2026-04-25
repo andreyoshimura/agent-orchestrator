@@ -46,6 +46,7 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertEqual(inspection["route"]["preferred"], "claude")
                 self.assertEqual(inspection["route"]["fallbacks"], ["gemini"])
                 self.assertEqual(inspection["route"]["provider_timeout_sec"], 30)
+                self.assertEqual(inspection["selection_preview"]["decision"], "keep_primary")
                 self.assertEqual(inspection["local_plan"]["selected_files"], ["paper_trade.py"])
                 self.assertEqual(inspection["context"]["status"], "ready")
                 self.assertTrue(inspection["context_sufficiency"]["context_sufficient"])
@@ -63,6 +64,7 @@ class TaskRunnerTest(unittest.TestCase):
                                 "limit": 2.0,
                                 "remaining": 2.0,
                                 "available": True,
+                                "remaining_ratio": 1.0,
                             },
                             "usable_for_estimated_cost": True,
                         },
@@ -74,11 +76,100 @@ class TaskRunnerTest(unittest.TestCase):
                                 "limit": 0.0,
                                 "remaining": 0.0,
                                 "available": False,
+                                "remaining_ratio": 0.0,
                             },
                             "usable_for_estimated_cost": False,
                         },
                     ],
                 )
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    def test_inspect_reports_proactive_switch_preview_when_primary_budget_is_low(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                state_store = StateStore(base_dir=f"{tmpdir}/state")
+                budget_manager = BudgetManager({"gemini": 1.0, "claude": 1.0}, state_store=state_store)
+                budget_manager.record("gemini", 0.8)
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "gemini", "fallback": ["claude"], "execution": {"max_provider_retries": 0, "fallback_on": ["temporary", "rate_limit", "network", "configuration", "provider_unavailable"], "budget_switch_threshold_ratio": 0.25}}}),
+                    budget_manager=budget_manager,
+                    provider_settings={
+                        "gemini": ProviderSettings(name="gemini", enabled=True, model="", api_key="", api_base=""),
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                )
+
+                inspection = runner.inspect(
+                    TaskRequest(
+                        task_type="review-file",
+                        payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                    ),
+                    estimated_cost=0.05,
+                )
+
+                self.assertEqual(inspection["selection_preview"]["decision"], "switch_now_due_to_budget")
+                self.assertEqual(inspection["selection_preview"]["selected_fallback"]["provider"], "claude")
+                self.assertIn("switching to fallback", inspection["selection_preview"]["reason"])
+            finally:
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO", old_target)
+
+    @patch.object(TaskRunner, "_execute_provider")
+    def test_run_proactively_switches_to_fallback_when_primary_budget_is_low(self, mock_execute_provider) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_path = os.path.join(tmpdir, "paper_trade.py")
+            with open(sample_path, "w", encoding="utf-8") as handle:
+                handle.write("print('paper')\n")
+
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO")
+            try:
+                os.environ["AI_DEFAULT_PROJECT"] = "ia-trade"
+                os.environ["AI_TARGET_REPO"] = tmpdir
+
+                state_store = StateStore(base_dir=f"{tmpdir}/state")
+                budget_manager = BudgetManager({"gemini": 1.0, "claude": 1.0}, state_store=state_store)
+                budget_manager.record("gemini", 0.8)
+
+                mock_execute_provider.return_value = {"provider": "claude", "status": "stub", "output": {"mode": "stub"}}
+
+                runner = TaskRunner(
+                    router=Router({"review-file": {"preferred": "gemini", "fallback": ["claude"], "execution": {"max_provider_retries": 0, "fallback_on": ["temporary", "rate_limit", "network", "configuration", "provider_unavailable"], "budget_switch_threshold_ratio": 0.25}}}),
+                    budget_manager=budget_manager,
+                    provider_settings={
+                        "gemini": ProviderSettings(name="gemini", enabled=True, model="", api_key="", api_base=""),
+                        "claude": ProviderSettings(name="claude", enabled=True, model="", api_key="", api_base=""),
+                    },
+                )
+                result = runner.run(
+                    TaskRequest(
+                        task_type="review-file",
+                        payload={"project_id": "ia-trade", "query": "paper", "objective": "Revisar entrypoint paper"},
+                    ),
+                    estimated_cost=0.05,
+                )
+
+                self.assertEqual(result.provider, "claude")
+                self.assertEqual(result.status, "stub")
+                self.assertEqual(result.output["selection_preview"]["decision"], "switch_now_due_to_budget")
+                self.assertEqual(
+                    result.output["provider_attempts"][0],
+                    {"provider": "gemini", "attempt": 0, "status": "skipped", "reason": "provider below proactive budget threshold"},
+                )
+                self.assertEqual(result.output["provider_attempts"][1]["provider"], "claude")
+                self.assertEqual(mock_execute_provider.call_count, 1)
             finally:
                 _restore_env("AI_DEFAULT_PROJECT", old_project)
                 _restore_env("AI_TARGET_REPO", old_target)

@@ -179,6 +179,35 @@ class OperationalStoreTest(unittest.TestCase):
             )
             self.assertIsNone(cached)
 
+    def test_persist_task_result_records_proactive_switch_telemetry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            store = OperationalStore(state_store=state_store, cache_store=cache_store)
+
+            store.persist_task_result(
+                task_type="review-file",
+                project_id="ia-trade",
+                payload={"query": "paper"},
+                output={
+                    "selection_preview": {
+                        "decision": "switch_now_due_to_budget",
+                        "primary_provider": "gemini",
+                        "selected_fallback": {"provider": "claude"},
+                    },
+                    "provider_result": {"provider": "claude", "status": "stub"},
+                    "provider_attempts": [{"provider": "claude", "attempt": 1, "status": "stub", "failure_type": "success"}],
+                },
+            )
+
+            telemetry = store.proactive_switch_summary()
+            self.assertEqual(telemetry["total_switches"], 1)
+            self.assertEqual(telemetry["by_task_type"], {"review-file": 1})
+            self.assertEqual(telemetry["by_primary_provider"], {"gemini": 1})
+            self.assertEqual(telemetry["by_fallback_provider"], {"claude": 1})
+            self.assertEqual(telemetry["by_route"], {"gemini->claude": 1})
+            self.assertEqual(telemetry["last_event"]["primary_provider"], "gemini")
+
     def test_state_store_handles_light_concurrent_writes_without_invalid_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             state_store = StateStore(base_dir=f"{tmpdir}/state")

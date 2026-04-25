@@ -24,6 +24,7 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 - As preferências e fallbacks de provider por tarefa ficam em `config/routing.yaml`
 - O comportamento de retry e fallback também é configurado por tarefa em `routing.<task>.execution`
 - o timeout HTTP por tarefa também pode ser configurado em `routing.<task>.execution.provider_timeout_sec`
+- a troca proativa de provider/modelo por budget headroom pode ser ajustada por tarefa em `routing.<task>.execution.budget_switch_threshold_ratio`
 - O core mantém defaults seguros, mas a política específica de cada tarefa deve ser ajustada na configuração, não codificada diretamente no runtime
 
 ## Persistência operacional
@@ -125,6 +126,7 @@ bash scripts/healthcheck.sh
 - `inspect-project` valida profile, arquivos do projeto e repo alvo, inclui `storage_quicklook` e expõe `health_summary` (`ok`/`degraded`) para leitura rápida
 - `diagnose-orchestrator` mostra estado de projeto, storage e execuções recentes
 - `diagnose-orchestrator` também mostra métricas de índice de cache, chaves recentes de cache de `inspect-task`, resumo de status recentes e `health_summary` agregado
+- `diagnose-orchestrator` também mostra `proactive_switch_telemetry` com contagem diária de trocas antecipadas por tarefa, provider primário e fallback escolhido
 - `diagnose-orchestrator` também mostra alertas de orçamento (`budget.alerts`) com limiar configurável por `AI_BUDGET_ALERT_THRESHOLD_RATIO` (default `0.1`)
 - ambos suportam `--health-only` para retornar payload compacto com `health_summary` e checks essenciais (útil em cron/CI)
 - ambos suportam `--fail-on-degraded` para retornar `exit code 2` quando `health_summary.status=degraded` (fail-fast em automação)
@@ -158,6 +160,8 @@ bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objecti
 - `inspect-task` também expõe `local_agent_output` (saída estruturada do agente local antes da chamada ao provider)
 - `inspect-task` agora também expõe `context_sufficiency`, `local_analysis` e `pipeline` (estágios explícitos do runtime)
 - `inspect-task` agora também expõe `synthesis` (prévia estruturada da etapa de síntese/arbitragem final)
+- `inspect-task` agora também expõe `selection_preview` com a decisão proativa de manter o primário ou trocar para fallback por budget headroom
+- `task_cli` agora troca proativamente de provider/modelo quando o budget headroom do primário fica abaixo do threshold configurado para a tarefa
 - `task_cli` agora expõe `execution_metrics` na saída (`planning_ms`, `provider_execution_ms`, `total_ms`, tentativas)
 - `task_cli` agora inclui `context_sufficiency`, `local_analysis` e `pipeline.stage_metrics` para diagnóstico de execução por estágio
 - `task_cli` agora também inclui `synthesis` com status final, provider final e ação recomendada

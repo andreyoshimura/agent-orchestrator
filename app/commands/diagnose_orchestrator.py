@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,22 @@ def _recent_task_status_summary(state_store: StateStore, limit: int = 25) -> dic
     return {
         "sampled_state_count": min(len(keys), limit),
         "statuses": dict(sorted(counts.items())),
+    }
+
+
+def _proactive_switch_telemetry(state_store: StateStore) -> dict[str, Any]:
+    key = f"proactive_switch_metrics_{date.today().isoformat()}"
+    payload = state_store.load(key)
+    if not isinstance(payload, dict):
+        payload = {}
+    return {
+        "date": payload.get("date", date.today().isoformat()),
+        "total_switches": int(payload.get("total_switches", 0)),
+        "by_task_type": payload.get("by_task_type", {}),
+        "by_primary_provider": payload.get("by_primary_provider", {}),
+        "by_fallback_provider": payload.get("by_fallback_provider", {}),
+        "by_route": payload.get("by_route", {}),
+        "last_event": payload.get("last_event"),
     }
 
 
@@ -214,6 +231,7 @@ def main() -> int:
                 for item in inspect_cache_entries[:5]
             ],
             "recent_task_status_summary": _recent_task_status_summary(state_store),
+            "proactive_switch_telemetry": _proactive_switch_telemetry(state_store),
             "storage_health": storage_health,
             "recent_task_states": _recent_task_states(state_store),
         },
