@@ -181,6 +181,7 @@ class CommandEntrypointsTest(unittest.TestCase):
                 ["engine.py"],
             )
             self.assertEqual(payload["inspection"]["context"]["status"], "ready")
+            self.assertEqual(payload["inspection"]["synthesis"]["status"], "preview")
             self.assertIn("preferred", payload["inspection"]["route"])
 
     def test_inspect_task_includes_dependency_map_for_map_dependencies_task(self) -> None:
@@ -281,6 +282,7 @@ class CommandEntrypointsTest(unittest.TestCase):
 
             self.assertEqual(payload["status"], "stub")
             self.assertEqual(payload["task_type"], "map-dependencies")
+            self.assertEqual(payload["output"]["synthesis"]["status"], "ready")
             self.assertEqual(payload["output"]["dependency_map"]["status"], "ok")
             self.assertEqual(payload["output"]["dependency_map"]["file"], "engine.py")
             self.assertEqual(payload["output"]["dependency_highlights"]["status"], "ready")

@@ -68,6 +68,17 @@ class TaskRunner:
                 status="degraded",
                 output={
                     "reason": "invalid payload: payload must be an object",
+                    "synthesis": {
+                        "status": "degraded",
+                        "mode": "run",
+                        "final_status": "degraded",
+                        "final_provider": "none",
+                        "context_sufficient": False,
+                        "missing_context_risks": ["invalid_payload"],
+                        "provider_attempt_count": 0,
+                        "recommended_action": "fix payload before executing the task",
+                        "reason": "invalid payload: payload must be an object",
+                    },
                     "pipeline": _pipeline_payload(stage_metrics),
                     "execution_metrics": _execution_metrics(
                         planning_ms=0,
@@ -129,6 +140,17 @@ class TaskRunner:
                 )
                 output = {
                     **cached_result["output"],
+                    "synthesis": cached_result["output"].get("synthesis")
+                    if isinstance(cached_result["output"], dict) and isinstance(cached_result["output"].get("synthesis"), dict)
+                    else self._synthesize_result_summary(
+                        mode="run",
+                        final_status=str(cached_result["status"]),
+                        final_provider=str(cached_result["provider"]),
+                        provider_result={"provider": cached_result["provider"], "status": cached_result["status"], "output": {}},
+                        context_sufficiency=context_sufficiency,
+                        local_analysis=local_analysis,
+                        provider_attempts=[],
+                    ),
                     "pipeline": _pipeline_payload(stage_metrics),
                     "execution_metrics": {
                         "cache_hit": True,
@@ -205,6 +227,15 @@ class TaskRunner:
                     **dependency_artifacts,
                     "provider_attempts": attempted_providers,
                     "provider_result": provider_result,
+                    "synthesis": self._synthesize_result_summary(
+                        mode="run",
+                        final_status="degraded",
+                        final_provider=str(provider_result["provider"]) if isinstance(provider_result, dict) else "none",
+                        provider_result=provider_result,
+                        context_sufficiency=context_sufficiency,
+                        local_analysis=local_analysis,
+                        provider_attempts=attempted_providers,
+                    ),
                     "pipeline": _pipeline_payload(stage_metrics),
                     "execution_metrics": _execution_metrics(
                         planning_ms=planning_ms,
@@ -232,6 +263,15 @@ class TaskRunner:
                 **dependency_artifacts,
                 "provider_result": provider_result,
                 "provider_attempts": attempted_providers,
+                "synthesis": self._synthesize_result_summary(
+                    mode="run",
+                    final_status=str(provider_result["status"]),
+                    final_provider=chosen_provider,
+                    provider_result=provider_result,
+                    context_sufficiency=context_sufficiency,
+                    local_analysis=local_analysis,
+                    provider_attempts=attempted_providers,
+                ),
                 "pipeline": _pipeline_payload(stage_metrics),
                 "execution_metrics": _execution_metrics(
                     planning_ms=planning_ms,
@@ -283,6 +323,17 @@ class TaskRunner:
                 },
                 "local_plan": {"status": "unavailable", "reason": "payload must be an object"},
                 "local_analysis": {"status": "unavailable", "reason": "payload must be an object"},
+                "synthesis": {
+                    "status": "unavailable",
+                    "mode": "inspect",
+                    "final_status": "inspect_preview",
+                    "final_provider": invalid_decision.provider,
+                    "context_sufficient": False,
+                    "missing_context_risks": ["invalid_payload"],
+                    "provider_attempt_count": 0,
+                    "recommended_action": "fix payload before inspecting the task",
+                    "reason": "payload must be an object",
+                },
                 "providers": [],
                 "pipeline": _pipeline_payload(stage_metrics),
             }
@@ -341,6 +392,15 @@ class TaskRunner:
             "context_sufficiency": planning["context_sufficiency"],
             "local_plan": planning["local_plan"],
             "local_analysis": planning["local_analysis"],
+            "synthesis": self._synthesize_result_summary(
+                mode="inspect",
+                final_status="inspect_preview",
+                final_provider=decision.provider,
+                provider_result=None,
+                context_sufficiency=planning["context_sufficiency"],
+                local_analysis=planning["local_analysis"],
+                provider_attempts=[],
+            ),
             "providers": provider_status,
             "pipeline": _pipeline_payload(stage_metrics),
         }
@@ -725,6 +785,55 @@ class TaskRunner:
                 }
             )
         return fingerprints
+
+    def _synthesize_result_summary(
+        self,
+        mode: str,
+        final_status: str,
+        final_provider: str,
+        provider_result: Dict[str, object] | None,
+        context_sufficiency: Dict[str, object],
+        local_analysis: Dict[str, object],
+        provider_attempts: list[Dict[str, object]],
+    ) -> Dict[str, object]:
+        missing_context_risks = context_sufficiency.get("missing_context_risks", [])
+        if not isinstance(missing_context_risks, list):
+            missing_context_risks = []
+        recommended_action = str(local_analysis.get("recommended_action", "")).strip()
+        if not recommended_action:
+            if final_status in {"completed", "stub"}:
+                recommended_action = "consume provider output and persist follow-up actions"
+            elif mode == "inspect":
+                recommended_action = "execute the task via task_cli to obtain provider output"
+            else:
+                recommended_action = "review provider attempts and adjust route/context before retrying"
+
+        provider_output = provider_result.get("output", {}) if isinstance(provider_result, dict) else {}
+        if not isinstance(provider_output, dict):
+            provider_output = {}
+        reason = str(provider_output.get("reason", "")).strip()
+        if not reason:
+            if final_status in {"completed", "stub"}:
+                reason = "provider completed successfully"
+            elif mode == "inspect":
+                reason = "inspect mode does not execute provider"
+            else:
+                reason = "provider execution did not complete successfully"
+
+        synthesis_status = "ready" if final_status in {"completed", "stub"} else "degraded"
+        if mode == "inspect":
+            synthesis_status = "preview"
+        return {
+            "status": synthesis_status,
+            "mode": mode,
+            "final_status": final_status,
+            "final_provider": final_provider,
+            "context_sufficient": bool(context_sufficiency.get("context_sufficient", False)),
+            "missing_context_risks": missing_context_risks,
+            "provider_attempt_count": len(provider_attempts),
+            "recommended_action": recommended_action,
+            "reason": reason,
+        }
 
 
 def _elapsed_ms(started_at: float) -> int:

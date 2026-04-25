@@ -25,6 +25,7 @@ class ProviderSettings:
     model: str
     api_key: str
     api_base: str
+    provider_type: str = ""
 
     @property
     def ready_for_live_execution(self) -> bool:
@@ -36,6 +37,7 @@ def load_provider_settings(config_path: str = "config/providers.yaml") -> Dict[s
     settings: Dict[str, ProviderSettings] = {}
 
     for provider_name, details in config.items():
+        provider_type = str(details.get("type", provider_name)).strip() or provider_name
         enabled_env = str(details.get("enabled_env", ""))
         model_env = str(details.get("model_env", ""))
         api_key_env = str(details.get("api_key_env", ""))
@@ -47,6 +49,7 @@ def load_provider_settings(config_path: str = "config/providers.yaml") -> Dict[s
             model=os.getenv(model_env, ""),
             api_key=os.getenv(api_key_env, ""),
             api_base=os.getenv(api_base_env, "").strip(),
+            provider_type=provider_type,
         )
 
     return settings

@@ -1,15 +1,24 @@
 providers:
   openai:
+    type: openai
     enabled_env: OPENAI_ENABLED
     model_env: OPENAI_MODEL
     api_key_env: OPENAI_API_KEY
     api_base_env: OPENAI_API_BASE
   gemini:
+    type: gemini
     enabled_env: GEMINI_ENABLED
     model_env: GEMINI_MODEL
     api_key_env: GEMINI_API_KEY
     api_base_env: GEMINI_API_BASE
+  gemini_v2:
+    type: gemini
+    enabled_env: GEMINI_V2_ENABLED
+    model_env: GEMINI_V2_MODEL
+    api_key_env: GEMINI_V2_API_KEY
+    api_base_env: GEMINI_V2_API_BASE
   claude:
+    type: claude
     enabled_env: CLAUDE_ENABLED
     model_env: CLAUDE_MODEL
     api_key_env: CLAUDE_API_KEY

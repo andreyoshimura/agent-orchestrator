@@ -67,6 +67,8 @@
 
 - data da retomada: `2026-04-24`
 - bloco concluído nesta sessão:
+  - runtime de providers generalizado para múltiplas contas por adapter (`type` em `config/providers.yaml` + fallback por prefixo `<provider>_...`)
+  - suporte explícito a `gemini_v2` no config/env/budget com reaproveitamento do adapter `gemini`
   - providers endurecidos para resposta parcial (JSON válido com campos ausentes/shape inválido) com erro estruturado:
     - `openai`: `missing_output_text` e `output_text_not_string`
     - `gemini`: `missing_candidates` e `candidates_not_list`
@@ -117,6 +119,7 @@
 - `TaskRunner` agora expõe pipeline multiestágio explícito em `run`/`inspect` (`pipeline.stage_metrics` + `pipeline.stages`)
 - `TaskRunner` agora expõe `context_sufficiency` estruturado (`context_sufficient`, `selected_files`, `missing_context_risks`, `reason`)
 - `local_agent_output` agora também aparece no estágio explícito `local_analysis` (mantendo compatibilidade com `local_plan`)
+- `TaskRunner` agora expõe `synthesis` em `run`/`inspect` para formalizar a etapa de síntese/arbitragem final sem remover campos antigos
   - `TaskRunner` agora publica `execution_metrics` por execução (planejamento, tentativas de provider e tempo total), com persistência no `OperationalStore`
   - `map-dependencies` legado agora usa `TaskRunner.inspect` internamente para consumir `dependency_map` do fluxo genérico
   - timeout de provider por tarefa (`provider_timeout_sec`) agora é lido de `routing.<task>.execution` e aplicado no runtime HTTP dos providers

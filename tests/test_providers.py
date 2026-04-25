@@ -25,6 +25,17 @@ class ProviderTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             get_provider("missing", ProviderSettings(name="missing", enabled=True, model="", api_key="", api_base=""))
 
+    def test_get_provider_supports_gemini_v2_alias(self) -> None:
+        provider = get_provider(
+            "gemini_v2",
+            ProviderSettings(name="gemini_v2", enabled=True, model="", api_key="", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.provider, "gemini")
+        self.assertEqual(response.status, "stub")
+        self.assertEqual(response.output["failure_type"], "configuration")
+
     @patch("app.providers.openai_provider.urllib_request.urlopen")
     def test_openai_provider_uses_live_execution_when_ready(self, mock_urlopen: MagicMock) -> None:
         response_handle = MagicMock()

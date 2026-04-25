@@ -106,8 +106,8 @@ set -a && source .env && set +a
 - ajuste `AI_DEFAULT_PROJECT` se quiser trocar o profile ativo
 - ajuste `AI_TARGET_REPO` para o caminho local do repositório-alvo
 - mantenha `AI_REPO_WRITE_ENABLED=false` por padrão
-- preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
-- use `OPENAI_API_BASE`, `GEMINI_API_BASE` e `CLAUDE_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
+- preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY`, `GEMINI_V2_MODEL` / `GEMINI_V2_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
+- use `OPENAI_API_BASE`, `GEMINI_API_BASE`, `GEMINI_V2_API_BASE` e `CLAUDE_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
 - `AI_CACHE_REUSE_ENABLED=true` (default no `task_cli`) reutiliza resultado de payload idêntico; use `false` para desativar globalmente
 - `AI_INSPECT_CACHE_REUSE_ENABLED=true` (default no `inspect-task`) reutiliza inspeções repetidas por payload
 - `AI_INSPECT_CACHE_TTL_SEC=30` controla TTL do cache de inspeção em segundos
@@ -157,8 +157,10 @@ bash scripts/task.sh assemble-context explain-file '{"file":"README.md","objecti
 - `inspect-task` suporta cache de inspeção com TTL para reduzir recomputação em chamadas repetidas; use `"force_refresh": true` no payload para bypass
 - `inspect-task` também expõe `local_agent_output` (saída estruturada do agente local antes da chamada ao provider)
 - `inspect-task` agora também expõe `context_sufficiency`, `local_analysis` e `pipeline` (estágios explícitos do runtime)
+- `inspect-task` agora também expõe `synthesis` (prévia estruturada da etapa de síntese/arbitragem final)
 - `task_cli` agora expõe `execution_metrics` na saída (`planning_ms`, `provider_execution_ms`, `total_ms`, tentativas)
 - `task_cli` agora inclui `context_sufficiency`, `local_analysis` e `pipeline.stage_metrics` para diagnóstico de execução por estágio
+- `task_cli` agora também inclui `synthesis` com status final, provider final e ação recomendada
 - `assemble-context` é o entrypoint principal para conferir o contexto bruto montado pelo orchestrator
 - para `map-dependencies`, ambos também retornam `dependency_map` quando houver arquivo Python selecionado
   - `dependency_map` inclui imports, símbolos, chamadas, `call_relations` priorizadas (`relation_score`/`relation_priority`/`relation_rank`), resumo executivo (`call_relation_summary`) com `risk_flags`, e resolução básica de imports locais para arquivos candidatos no repo
@@ -230,6 +232,14 @@ agent-orchestrator/
 - `AI_PROJECTS_ROOT` pode apontar para um diretório alternativo de profiles ao validar múltiplos projetos localmente
 - cada `projects/<project_id>/project.yaml` pode definir `context_rules` para customizar seleção de contexto por profile (`max_target_files`, `task_file_limits`, `task_queries`, `pinned_files_by_task`)
 - cada `projects/<project_id>/project.yaml` também pode definir `task_prompt_overrides` para mapear `task_type -> prompt/agente`
+
+## Adicionar providers e contas
+
+- o runtime usa `config/providers.yaml` como registro principal de providers/contas
+- cada entrada pode declarar `type` (`openai`, `gemini`, `claude`) para reutilizar o mesmo adapter com nomes diferentes (ex.: `gemini_v2`)
+- quando `type` não é declarado, o runtime usa o nome da entrada; para nomes no formato `<base>_...` ele resolve automaticamente pelo prefixo base (`gemini_...` -> adapter `gemini`)
+- para adicionar uma nova conta, crie a entrada em `config/providers.yaml`, adicione variáveis na `.env` (`*_ENABLED`, `*_MODEL`, `*_API_KEY`, `*_API_BASE`) e, opcionalmente, orçamento em `config/budgets.yaml`
+- não é necessário criar novo alias CLI para cada conta/provider; o fluxo genérico atual já cobre roteamento, retry/fallback, cache e diagnóstico
 
 ## Próximo passo
 

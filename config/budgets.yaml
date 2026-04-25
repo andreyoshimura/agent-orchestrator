@@ -3,6 +3,8 @@ budgets:
     daily_usd_env: BUDGET_OPENAI_DAILY_USD
   gemini:
     daily_usd_env: BUDGET_GEMINI_DAILY_USD
+  gemini_v2:
+    daily_usd_env: BUDGET_GEMINI_V2_DAILY_USD
   claude:
     daily_usd_env: BUDGET_CLAUDE_DAILY_USD
 limits:

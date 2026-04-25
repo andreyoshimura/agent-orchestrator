@@ -128,6 +128,9 @@ class TaskRunnerTest(unittest.TestCase):
                 self.assertTrue(result.output["context_sufficiency"]["context_sufficient"])
                 self.assertEqual(result.output["provider_result"]["provider"], "claude")
                 self.assertEqual(result.output["provider_result"]["status"], "stub")
+                self.assertEqual(result.output["synthesis"]["status"], "ready")
+                self.assertEqual(result.output["synthesis"]["mode"], "run")
+                self.assertEqual(result.output["synthesis"]["final_provider"], "claude")
                 self.assertGreater(result.output["provider_result"]["output"]["prompt_length"], 0)
                 self.assertEqual(
                     result.output["provider_result"]["output"]["metadata"]["local_agent_output"]["agent"],
@@ -332,6 +335,7 @@ class TaskRunnerTest(unittest.TestCase):
             self.assertFalse(inspection["context_sufficiency"]["context_sufficient"])
             self.assertEqual(inspection["local_plan"]["status"], "unavailable")
             self.assertEqual(inspection["local_analysis"]["status"], "unavailable")
+            self.assertEqual(inspection["synthesis"]["status"], "preview")
             self.assertEqual(inspection["providers"][0]["provider"], "claude")
         finally:
             _restore_env("AI_DEFAULT_PROJECT", old_project)
@@ -354,6 +358,7 @@ class TaskRunnerTest(unittest.TestCase):
         self.assertEqual(inspection["context"]["status"], "unavailable")
         self.assertEqual(inspection["context"]["reason"], "payload must be an object")
         self.assertFalse(inspection["context_sufficiency"]["context_sufficient"])
+        self.assertEqual(inspection["synthesis"]["status"], "unavailable")
         self.assertEqual(inspection["pipeline"]["stages"][0]["status"], "error")
 
     def test_run_uses_alternate_project_root_from_env(self) -> None:
@@ -532,6 +537,8 @@ class TaskRunnerTest(unittest.TestCase):
 
                 self.assertEqual(result.provider, "gemini")
                 self.assertEqual(result.status, "degraded")
+                self.assertEqual(result.output["synthesis"]["status"], "degraded")
+                self.assertEqual(result.output["synthesis"]["final_provider"], "gemini")
                 self.assertEqual(
                     result.output["provider_attempts"],
                     [{"provider": "gemini", "attempt": 1, "status": "error", "failure_type": "invalid_request"}],

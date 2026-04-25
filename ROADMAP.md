@@ -104,11 +104,13 @@
     - `persistence`
     - `return_diagnostics`
   - `run`/`inspect` agora incluem `pipeline` + `stage_metrics` e objeto `context_sufficiency`
+  - `run`/`inspect` agora também incluem `synthesis` para formalizar a etapa de síntese/arbitragem final
 - `[~]` conectar agentes ao carregamento de prompts e memória do projeto
   - `build_local_task_plan` agora retorna `local_agent_output` estruturado por agente (`repo_worker`, `micro_reviewer`, `arbiter`)
   - `TaskRunner` repassa `local_agent_output` no plano local e no metadata enviado ao provider
   - `local_agent_output` agora também aparece como estágio explícito (`local_analysis`) no runtime
 - `[x]` padronizar interface de providers além do status `stub`
+- `[x]` permitir múltiplas contas por adapter sem novo código (mapeamento `type` + resolução por prefixo em nomes `<provider>_...`)
 - `[~]` adicionar fallback real entre providers
 - `[~]` externalizar retry/fallback policy para configuração por tarefa
   - `provider_timeout_sec` por tarefa agora está disponível no `routing.<task>.execution` e aplicado no runtime de providers
