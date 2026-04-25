@@ -249,3 +249,21 @@
   - refinar threshold por profile ou task-type
   - ajustar a heurística para ficar mais próxima de consumo real por modelo/tarefa
   - opcionalmente adicionar alerta quando a telemetria de trocas proativas crescer demais no dia
+
+## Checkpoint final desta sessão
+
+- data do checkpoint: `2026-04-25`
+- estado de publicação: mudanças prontas localmente (pendente commit/push)
+- bloco concluído:
+  - suporte nativo a `openrouter` no runtime de providers
+  - provider `openrouter` com parsing tolerante a formatos alternativos de `choices/message.content`
+  - ajuste de proteção de custo/limite com `max_tokens=2048` no adapter OpenRouter
+  - inclusão de `openrouter` no registro de providers, budget/config e fallback de rotas
+  - atualização de docs e testes específicos do novo provider
+- evidência de validação:
+  - suíte de testes de providers/config passando
+  - execução live de `task_cli compare-options` forçando `openrouter` finalizando com `status=completed`
+- onde continuar depois:
+  - tornar `provider_max_tokens` configurável por tarefa no `routing.<task>.execution`
+  - classificar `HTTP 402` como falha operacional específica (crédito insuficiente)
+  - persistir métricas de custo/tokens do OpenRouter no `OperationalStore` para diagnóstico diário

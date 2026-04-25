@@ -41,6 +41,7 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 - **Claude free**: review local pequeno, análise de snippets, segunda opinião
 - **Gemini**: análise ampla do repositório, mapeamento de dependências, planejamento de refactors maiores
 - **OpenAI**: arbitragem, síntese, decisão final
+- **OpenRouter**: fallback adicional multi-modelo com compatibilidade de rota OpenAI-like
 
 ## Tarefas iniciais
 
@@ -107,8 +108,8 @@ set -a && source .env && set +a
 - ajuste `AI_DEFAULT_PROJECT` se quiser trocar o profile ativo
 - ajuste `AI_TARGET_REPO` para o caminho local do repositório-alvo
 - mantenha `AI_REPO_WRITE_ENABLED=false` por padrão
-- preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY`, `GEMINI_V2_MODEL` / `GEMINI_V2_API_KEY` e `CLAUDE_MODEL` / `CLAUDE_API_KEY` apenas para os providers que realmente for usar
-- use `OPENAI_API_BASE`, `GEMINI_API_BASE`, `GEMINI_V2_API_BASE` e `CLAUDE_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
+- preencha `OPENAI_MODEL` / `OPENAI_API_KEY`, `GEMINI_MODEL` / `GEMINI_API_KEY`, `GEMINI_V2_MODEL` / `GEMINI_V2_API_KEY`, `CLAUDE_MODEL` / `CLAUDE_API_KEY` e `OPENROUTER_MODEL` / `OPENROUTER_API_KEY` apenas para os providers que realmente for usar
+- use `OPENAI_API_BASE`, `GEMINI_API_BASE`, `GEMINI_V2_API_BASE`, `CLAUDE_API_BASE` e `OPENROUTER_API_BASE` somente se precisar sobrescrever endpoint padrão (proxy/gateway local)
 - `AI_CACHE_REUSE_ENABLED=true` (default no `task_cli`) reutiliza resultado de payload idêntico; use `false` para desativar globalmente
 - `AI_INSPECT_CACHE_REUSE_ENABLED=true` (default no `inspect-task`) reutiliza inspeções repetidas por payload
 - `AI_INSPECT_CACHE_TTL_SEC=30` controla TTL do cache de inspeção em segundos

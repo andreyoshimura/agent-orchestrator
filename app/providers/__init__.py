@@ -3,12 +3,14 @@ from app.providers.claude_provider import ClaudeProvider
 from app.providers.config import ProviderSettings
 from app.providers.gemini_provider import GeminiProvider
 from app.providers.openai_provider import OpenAIProvider
+from app.providers.openrouter_provider import OpenRouterProvider
 
 
 PROVIDER_REGISTRY = {
     "claude": ClaudeProvider,
     "gemini": GeminiProvider,
     "openai": OpenAIProvider,
+    "openrouter": OpenRouterProvider,
 }
 
 

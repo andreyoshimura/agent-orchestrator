@@ -23,3 +23,9 @@ providers:
     model_env: CLAUDE_MODEL
     api_key_env: CLAUDE_API_KEY
     api_base_env: CLAUDE_API_BASE
+  openrouter:
+    type: openrouter
+    enabled_env: OPENROUTER_ENABLED
+    model_env: OPENROUTER_MODEL
+    api_key_env: OPENROUTER_API_KEY
+    api_base_env: OPENROUTER_API_BASE

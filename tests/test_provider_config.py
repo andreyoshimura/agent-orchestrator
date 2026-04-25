@@ -51,6 +51,35 @@ class ProviderConfigTest(unittest.TestCase):
             _restore_env("GEMINI_V2_API_KEY", old_key)
             _restore_env("GEMINI_V2_API_BASE", old_base)
 
+    def test_load_provider_settings_supports_openrouter_configuration(self) -> None:
+        old_enabled = os.environ.get("OPENROUTER_ENABLED")
+        old_model = os.environ.get("OPENROUTER_MODEL")
+        old_key = os.environ.get("OPENROUTER_API_KEY")
+        old_base = os.environ.get("OPENROUTER_API_BASE")
+        try:
+            os.environ["OPENROUTER_ENABLED"] = "true"
+            os.environ["OPENROUTER_MODEL"] = "openrouter-test"
+            os.environ["OPENROUTER_API_KEY"] = "secret-or"
+            os.environ["OPENROUTER_API_BASE"] = "https://openrouter.example/api/v1/chat/completions"
+
+            settings = load_provider_settings()
+
+            self.assertIn("openrouter", settings)
+            self.assertTrue(settings["openrouter"].enabled)
+            self.assertEqual(settings["openrouter"].provider_type, "openrouter")
+            self.assertEqual(settings["openrouter"].model, "openrouter-test")
+            self.assertEqual(settings["openrouter"].api_key, "secret-or")
+            self.assertEqual(
+                settings["openrouter"].api_base,
+                "https://openrouter.example/api/v1/chat/completions",
+            )
+            self.assertTrue(settings["openrouter"].ready_for_live_execution)
+        finally:
+            _restore_env("OPENROUTER_ENABLED", old_enabled)
+            _restore_env("OPENROUTER_MODEL", old_model)
+            _restore_env("OPENROUTER_API_KEY", old_key)
+            _restore_env("OPENROUTER_API_BASE", old_base)
+
 
 def _restore_env(name: str, value: str | None) -> None:
     if value is None:

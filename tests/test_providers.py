@@ -36,6 +36,17 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(response.status, "stub")
         self.assertEqual(response.output["failure_type"], "configuration")
 
+    def test_get_provider_supports_openrouter(self) -> None:
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="", api_key="", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.provider, "openrouter")
+        self.assertEqual(response.status, "stub")
+        self.assertEqual(response.output["failure_type"], "configuration")
+
     @patch("app.providers.openai_provider.urllib_request.urlopen")
     def test_openai_provider_uses_live_execution_when_ready(self, mock_urlopen: MagicMock) -> None:
         response_handle = MagicMock()
@@ -285,6 +296,74 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(response.status, "error")
         self.assertEqual(response.output["failure_type"], "temporary")
         self.assertEqual(response.output["reason"], "invalid_response_shape:candidates_not_list")
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_uses_live_execution_when_ready(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"id":"gen_123","choices":[{"message":{"content":"ok openrouter"}}]}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "completed")
+        self.assertEqual(response.output["mode"], "live")
+        self.assertEqual(response.output["output_text"], "ok openrouter")
+        request_obj = mock_urlopen.call_args.args[0]
+        self.assertIn('"max_tokens": 2048', request_obj.data.decode("utf-8"))
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_handles_partial_response_missing_choices(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"gen_123"}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.output["failure_type"], "temporary")
+        self.assertEqual(response.output["reason"], "invalid_response_shape:missing_choices")
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_accepts_message_content_list(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"id":"gen_123","choices":[{"message":{"content":[{"type":"text","text":"ok list"}]}}]}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "completed")
+        self.assertEqual(response.output["output_text"], "ok list")
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_accepts_choice_text_fallback(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"gen_123","choices":[{"text":"ok fallback"}]}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+
+        self.assertEqual(response.status, "completed")
+        self.assertEqual(response.output["output_text"], "ok fallback")
 
     def test_base_provider_run_handles_internal_exception(self) -> None:
         class BrokenProvider(BaseProvider):

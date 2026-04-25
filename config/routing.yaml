@@ -1,7 +1,7 @@
 routing:
   explain-file:
     preferred: claude
-    fallback: [gemini, openai]
+    fallback: [gemini, openai, openrouter]
     execution:
       max_provider_retries: 0
       provider_timeout_sec: 30
@@ -9,7 +9,7 @@ routing:
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   review-file:
     preferred: claude
-    fallback: [gemini, openai]
+    fallback: [gemini, openai, openrouter]
     execution:
       max_provider_retries: 1
       provider_timeout_sec: 30
@@ -17,21 +17,21 @@ routing:
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   review-snippet:
     preferred: claude
-    fallback: [gemini, openai]
+    fallback: [gemini, openai, openrouter]
     execution:
       max_provider_retries: 1
       budget_switch_threshold_ratio: 0.25
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   review-diff:
     preferred: gemini
-    fallback: [claude, openai]
+    fallback: [claude, openai, openrouter]
     execution:
       max_provider_retries: 1
       budget_switch_threshold_ratio: 0.25
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   map-dependencies:
     preferred: gemini
-    fallback: [claude, openai]
+    fallback: [claude, openai, openrouter]
     execution:
       max_provider_retries: 1
       provider_timeout_sec: 45
@@ -39,21 +39,21 @@ routing:
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   summarize-module:
     preferred: gemini
-    fallback: [claude, openai]
+    fallback: [claude, openai, openrouter]
     execution:
       max_provider_retries: 1
       budget_switch_threshold_ratio: 0.25
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   compare-options:
     preferred: openai
-    fallback: [gemini]
+    fallback: [gemini, openrouter]
     execution:
       max_provider_retries: 1
       budget_switch_threshold_ratio: 0.25
       fallback_on: [temporary, rate_limit, network, configuration, provider_unavailable]
   final-decision:
     preferred: openai
-    fallback: [gemini]
+    fallback: [gemini, openrouter]
     execution:
       max_provider_retries: 1
       budget_switch_threshold_ratio: 0.25

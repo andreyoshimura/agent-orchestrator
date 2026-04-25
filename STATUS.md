@@ -195,3 +195,32 @@
   - revisar se vale diferenciar threshold por profile ou task-type com base em uso real
   - considerar telemetria/alerta adicional quando a troca proativa ficar acima do esperado
   - manter o padrão atual de confiabilidade, cache e diagnóstico como base estável
+
+## Checkpoint final desta sessão
+
+- data do checkpoint: `2026-04-25`
+- branch: `main`
+- estado do worktree: com alterações locais (ainda não commitadas)
+- o que foi entregue nesta sessão:
+  - integração nativa de `openrouter` como provider de primeira classe no runtime
+  - novo adapter em `app/providers/openrouter_provider.py` com:
+    - endpoint default `https://openrouter.ai/api/v1/chat/completions`
+    - parsing robusto para múltiplos formatos de resposta (`message.content` string/lista e fallback `choices[].text`)
+    - `max_tokens` padrão reduzido para `2048` (evitando erro de crédito por limite excessivo)
+  - registro/configuração completa do provider:
+    - `config/providers.yaml` com `OPENROUTER_*`
+    - `config/budgets.yaml` com `BUDGET_OPENROUTER_DAILY_USD` e `MAX_CONTEXT_FILES_OPENROUTER`
+    - `.env.example` atualizado com variáveis de OpenRouter
+  - roteamento atualizado para incluir `openrouter` em fallbacks por tarefa (`config/routing.yaml`)
+  - documentação atualizada no `README.md` para refletir o novo provider
+  - cobertura de testes ampliada para OpenRouter (`tests/test_providers.py`, `tests/test_provider_config.py`)
+- validação executada nesta sessão:
+  - testes unitários de providers/config passando localmente
+  - smoke test live do `task_cli` forçando rota para `openrouter` concluído com `status=completed`
+- observações operacionais para continuidade:
+  - desabilitações de `OPENAI_ENABLED`/`GEMINI_ENABLED` usadas durante smoke tests foram temporárias por comando; `.env` permanece com os providers habilitados
+  - `OPENROUTER_MODEL` foi ajustado para um model id válido (`openrouter/pareto-code`) para validação live
+- ponto exato para retomada:
+  - opcional: mover `provider_max_tokens` para política por tarefa em `routing.<task>.execution`
+  - opcional: adicionar classificação específica de erro para `HTTP 402` (insufficient credits) em providers
+  - opcional: incluir telemetry de custo/tokens retornados pelo OpenRouter no `OperationalStore`

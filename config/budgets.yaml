@@ -7,8 +7,11 @@ budgets:
     daily_usd_env: BUDGET_GEMINI_V2_DAILY_USD
   claude:
     daily_usd_env: BUDGET_CLAUDE_DAILY_USD
+  openrouter:
+    daily_usd_env: BUDGET_OPENROUTER_DAILY_USD
 limits:
   max_context_files:
     claude_env: MAX_CONTEXT_FILES_CLAUDE
     gemini_env: MAX_CONTEXT_FILES_GEMINI
     openai_env: MAX_CONTEXT_FILES_OPENAI
+    openrouter_env: MAX_CONTEXT_FILES_OPENROUTER
