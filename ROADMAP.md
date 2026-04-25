@@ -230,3 +230,22 @@
 - `app/core/file_selector.py` centraliza coleta, ranking e seleção automática de arquivos Python
 - `scripts/task.sh inspect-task` já permite inspecionar qualquer task sem criar wrapper dedicado
 - `AI_PROJECTS_ROOT` já permite validar e carregar roots alternativos de profiles no runtime
+
+## Checkpoint final desta sessão
+
+- data do checkpoint: `2026-04-24`
+- commit publicado: `38ea6e4` (`Add proactive budget-based provider switching`)
+- remoto sincronizado: `origin/main`
+- estado funcional entregue:
+  - fallback proativo por budget headroom implementado no `TaskRunner`
+  - preview explícito da decisão em `inspect-task` e `task_cli`
+  - `selection_preview` com decisões operacionais curtas: `keep_primary`, `switch_now_due_to_budget`, `defer_switch_no_viable_fallback`
+  - `diagnose-orchestrator` com telemetria diária de trocas proativas
+  - persistência de métricas no `OperationalStore`
+  - documentação e testes atualizados
+- estado da validação:
+  - suíte completa passando com `126` testes
+- onde continuar depois:
+  - refinar threshold por profile ou task-type
+  - ajustar a heurística para ficar mais próxima de consumo real por modelo/tarefa
+  - opcionalmente adicionar alerta quando a telemetria de trocas proativas crescer demais no dia

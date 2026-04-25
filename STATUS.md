@@ -174,3 +174,24 @@
 - `app/core/operational_store.py`
 - `app/core/context_builder.py`
 - `app/core/file_selector.py`
+
+## Checkpoint final desta sessão
+
+- data do checkpoint: `2026-04-24`
+- branch: `main`
+- remoto: `origin/main` atualizado com o commit `38ea6e4` (`Add proactive budget-based provider switching`)
+- suíte validada antes do push: `python3 -m unittest -q` com `126` testes (`OK`)
+- o que foi entregue nesta sessão:
+  - seleção proativa de provider/modelo por budget headroom no `TaskRunner`
+  - threshold configurável por tarefa em `routing.<task>.execution.budget_switch_threshold_ratio`
+  - preview operacional da decisão em `inspect-task` e `task_cli` via `selection_preview`
+  - telemetria diária de trocas proativas em `diagnose-orchestrator`
+  - persistência da telemetria no `OperationalStore`
+  - documentação atualizada em `README.md`, `STATUS.md` e `ROADMAP.md`
+- onde paramos:
+  - o fluxo funcional já está pronto e publicado no remoto
+  - o próximo trabalho, se retomarmos, é refinar a política de troca por modelo/tarefa e evoluir o alerta/telemetria de uso
+- ponto exato para retomada:
+  - revisar se vale diferenciar threshold por profile ou task-type com base em uso real
+  - considerar telemetria/alerta adicional quando a troca proativa ficar acima do esperado
+  - manter o padrão atual de confiabilidade, cache e diagnóstico como base estável
