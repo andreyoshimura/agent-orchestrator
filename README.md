@@ -41,7 +41,7 @@ Orquestrador genérico de IA e agentes com múltiplos providers para repositóri
 - **Claude free**: review local pequeno, análise de snippets, segunda opinião
 - **Gemini**: análise ampla do repositório, mapeamento de dependências, planejamento de refactors maiores
 - **OpenAI**: arbitragem, síntese, decisão final
-- **OpenRouter**: fallback adicional multi-modelo com compatibilidade de rota OpenAI-like
+- **OpenRouter**: fallback adicional multi-modelo com compatibilidade de rota OpenAI-like. Validado como provedor de fallback funcional.
 
 ## Tarefas iniciais
 
