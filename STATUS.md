@@ -1,5 +1,19 @@
 # Status
 
+## AI session note
+
+For daily AI continuity, also check:
+
+- `.ai_context/SESSION_STATE.md`
+- `.ai_context/AI_SYNC.md`
+- `docs/AI_CONTEXT_PROGRESS.md`
+- `docs/AI_SESSION_WORKFLOW.md`
+
+This file remains the development status and technical checkpoint log.
+The `.ai_context/` files are the shared working context for OpenAI, Gemini, Codex and other agents.
+
+---
+
 ## Resumo atual
 
 - o fluxo manual foi levado até cerca da etapa 23
