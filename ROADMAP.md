@@ -1,5 +1,18 @@
 # Roadmap
 
+## AI context note
+
+This roadmap tracks product/runtime evolution of the orchestrator.
+AI workflow infrastructure is tracked separately in:
+
+- `docs/AI_CONTEXT_PROGRESS.md`
+- `.ai_context/AI_SYNC.md`
+- `docs/AI_SESSION_WORKFLOW.md`
+
+Do not confuse roadmap phases below with AI-context infrastructure phases.
+
+---
+
 ## Status
 
 - `[x]` concluído
