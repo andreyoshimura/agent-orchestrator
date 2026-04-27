@@ -2,6 +2,22 @@
 
 Orquestrador genérico de IA e agentes com múltiplos providers para repositórios locais.
 
+## AI workflow
+
+For OpenAI, Gemini, Codex or other agents:
+
+```bash
+bash scripts/start_ai_session.sh
+```
+
+Then paste the generated prompt into the AI tool.
+
+See:
+
+- `docs/AI_SESSION_WORKFLOW.md`
+- `.ai_context/AI_SYNC.md`
+- `.ai_context/SESSION_STATE.md`
+
 ## Objetivos
 
 - Rotear tarefas entre múltiplos providers de IA
