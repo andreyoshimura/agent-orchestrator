@@ -6,8 +6,9 @@ Este arquivo registra a implantacao da infraestrutura de continuidade, alinhamen
 
 - Projeto: agent-orchestrator
 - Repo: `andreyoshimura/agent-orchestrator`
-- Fase concluida: Fase 1 - Contexto IA minimo e guardrails
-- Fase atual: Fase 2 - Documentacao operacional
+- Fase concluida: Fase 4 - Bundles IA
+- Proxima fase obrigatoria: nenhuma
+- Status: infraestrutura IA basica completa
 
 ## Objetivo da infraestrutura
 
@@ -38,46 +39,79 @@ Resultado:
 
 ## Fase 2 - Documentacao operacional
 
-Status: em andamento
+Status: concluida
 
-Arquivos previstos:
+Arquivos criados:
 
 - `docs/AI_CONTEXT_PROGRESS.md`
 - `docs/AI_SESSION_WORKFLOW.md`
 
-Objetivo:
+Resultado:
 
-- Documentar o fluxo de inicio e fim de sessao.
-- Registrar fases concluidas.
-- Evitar dependencia de memoria humana.
+- Fluxo de inicio e fim de sessao documentado.
+- Fases concluidas registradas.
+- Processo nao depende mais de memoria humana.
 
-## Proximas fases previstas
+## Fase 3 - Scripts de sessao
 
-### Fase 3 - Scripts de sessao
+Status: concluida
 
-Criar:
+Arquivos criados:
 
 - `scripts/start_ai_session.sh`
 - `scripts/end_ai_session.sh`
 
-Objetivo:
+Resultado:
 
-- Automatizar inicio de trabalho com IA.
-- Atualizar contexto operacional.
-- Persistir onde paramos no encerramento.
+- Inicio de sessao automatizado com diagnosticos seguros.
+- Prompt pronto para IA impresso no terminal.
+- Encerramento de sessao atualiza `.ai_context/SESSION_STATE.md`.
 
-### Fase 4 - Bundles IA
+Uso:
 
-Criar:
+```bash
+bash scripts/start_ai_session.sh
+bash scripts/end_ai_session.sh "resumo curto da sessao"
+```
+
+## Fase 4 - Bundles IA
+
+Status: concluida
+
+Arquivos criados:
 
 - `.ai_context/AI_BUNDLE_SHORT.md`
 - `.ai_context/AI_BUNDLE.md`
 - `scripts/generate_ai_bundle.sh`
 
-Objetivo:
+Resultado:
 
-- Permitir copiar contexto unico para IA externa.
-- Evitar abrir muitos arquivos manualmente.
+- Contexto portavel para OpenAI, Gemini, Codex e outros agentes.
+- Bundle curto para uso diario.
+- Bundle completo para sessoes longas.
+- Menos necessidade de abrir varios arquivos manualmente.
+
+Uso:
+
+```bash
+bash scripts/generate_ai_bundle.sh
+```
+
+## Fluxo diario recomendado
+
+Inicio:
+
+```bash
+bash scripts/start_ai_session.sh
+```
+
+Depois copiar o prompt impresso para OpenAI/Gemini/Codex.
+
+Fim:
+
+```bash
+bash scripts/end_ai_session.sh "resumo do que foi feito"
+```
 
 ## Comandos seguros de retomada
 
@@ -87,6 +121,17 @@ bash scripts/task.sh inspect-project
 bash scripts/task.sh diagnose-orchestrator --health-only
 bash scripts/task.sh inspect-budget
 ```
+
+## Proximas fases opcionais
+
+Nenhuma fase obrigatoria no momento.
+
+Possiveis evolucoes futuras:
+
+- copiar prompt automaticamente para clipboard;
+- abrir bundle automaticamente no terminal/editor;
+- integrar com tmux ou workflow local;
+- adicionar validacao automatica dos arquivos `.ai_context`.
 
 ## Regra permanente
 
