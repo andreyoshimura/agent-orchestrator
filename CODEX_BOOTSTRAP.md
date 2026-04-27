@@ -1,5 +1,20 @@
 # Agent Orchestrator Codex Bootstrap
 
+## Context sync
+
+Before following this bootstrap, read the shared AI context:
+
+1. `.ai_context/CONTEXT_MINIMAL.md`
+2. `.ai_context/GUARDRAILS.md`
+3. `.ai_context/TASK_FORMATS.md`
+4. `.ai_context/AI_SYNC.md`
+5. `.ai_context/SESSION_STATE.md`
+
+This file remains the Codex bootstrap for repository-specific behavior.
+The `.ai_context/` files define the shared context used by OpenAI, Gemini, Codex and other agents.
+
+---
+
 ## Mission
 
 You are working on `agent-orchestrator`.
