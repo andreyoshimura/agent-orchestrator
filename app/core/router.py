@@ -11,6 +11,7 @@ class RouteDecision:
     fallback_on: List[str]
     provider_timeout_sec: int
     budget_switch_threshold_ratio: float
+    provider_max_tokens: int
 
 
 class Router:
@@ -32,6 +33,9 @@ class Router:
             budget_switch_threshold_ratio = 0.0
         if budget_switch_threshold_ratio > 1:
             budget_switch_threshold_ratio = 1.0
+        provider_max_tokens = int(execution.get("provider_max_tokens", 2048))
+        if provider_max_tokens <= 0:
+            provider_max_tokens = 2048
         return RouteDecision(
             task_type=task_type,
             provider=provider,
@@ -40,4 +44,5 @@ class Router:
             fallback_on=fallback_on,
             provider_timeout_sec=provider_timeout_sec,
             budget_switch_threshold_ratio=budget_switch_threshold_ratio,
+            provider_max_tokens=provider_max_tokens,
         )

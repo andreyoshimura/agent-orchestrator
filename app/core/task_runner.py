@@ -215,6 +215,7 @@ class TaskRunner:
                 max_provider_retries=decision.max_provider_retries,
                 fallback_on=decision.fallback_on,
                 provider_timeout_sec=decision.provider_timeout_sec,
+                provider_max_tokens=decision.provider_max_tokens,
             )
             attempted_providers.extend(provider_attempts)
             attempt_metrics.extend(provider_attempt_metrics)
@@ -601,6 +602,7 @@ class TaskRunner:
         local_plan: object,
         context_info: Dict[str, object],
         provider_timeout_sec: int = 30,
+        provider_max_tokens: int = 2048,
     ) -> Dict[str, object]:
         if local_plan is None:
             return {
@@ -638,6 +640,7 @@ class TaskRunner:
                     "selected_files": getattr(local_plan, "selected_files", []),
                     "local_agent_output": getattr(local_plan, "local_agent_output", {}),
                     "provider_timeout_sec": provider_timeout_sec,
+                    "provider_max_tokens": provider_max_tokens,
                     "context": context_info,
                 },
             )
@@ -754,6 +757,7 @@ class TaskRunner:
         max_provider_retries: int,
         fallback_on: list[str],
         provider_timeout_sec: int,
+        provider_max_tokens: int = 2048,
     ) -> tuple[Dict[str, object], list[Dict[str, object]], list[Dict[str, object]], bool]:
         attempts: list[Dict[str, object]] = []
         attempt_metrics: list[Dict[str, object]] = []
@@ -767,6 +771,7 @@ class TaskRunner:
                 local_plan=local_plan_object,
                 context_info=context_info,
                 provider_timeout_sec=provider_timeout_sec,
+                provider_max_tokens=provider_max_tokens,
             )
             attempt_duration_ms = _elapsed_ms(attempt_started_at)
             failure_type = classify_provider_failure(current_result["status"], current_result.get("output"))

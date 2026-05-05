@@ -258,6 +258,45 @@ class OperationalStoreTest(unittest.TestCase):
             self.assertIsInstance(final_payload.get("value"), int)
             self.assertEqual(final_payload.get("kind"), "cache")
 
+    def test_persist_task_result_captures_provider_usage_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = OperationalStore(
+                state_store=StateStore(base_dir=f"{tmpdir}/state"),
+                cache_store=CacheStore(base_dir=f"{tmpdir}/cache"),
+            )
+            output = {
+                "provider_result": {
+                    "provider": "openrouter",
+                    "status": "completed",
+                    "output": {
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                    },
+                },
+            }
+            refs = store.persist_task_result("review-file", "demo", {}, output)
+            raw = store.state_store.load(refs["state_key"])
+            self.assertIsInstance(raw, dict)
+            usage = raw.get("provider_usage")
+            self.assertEqual(usage, {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
+
+    def test_persist_task_result_provider_usage_is_none_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = OperationalStore(
+                state_store=StateStore(base_dir=f"{tmpdir}/state"),
+                cache_store=CacheStore(base_dir=f"{tmpdir}/cache"),
+            )
+            output = {
+                "provider_result": {
+                    "provider": "claude",
+                    "status": "completed",
+                    "output": {"output_text": "ok"},
+                },
+            }
+            refs = store.persist_task_result("review-file", "demo", {}, output)
+            raw = store.state_store.load(refs["state_key"])
+            self.assertIsInstance(raw, dict)
+            self.assertIsNone(raw.get("provider_usage"))
+
     def test_cache_store_tracks_key_index_and_supports_prefix_listing(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_store = CacheStore(base_dir=f"{tmpdir}/cache")

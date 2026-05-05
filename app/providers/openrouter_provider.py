@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 from urllib import error, request as urllib_request
 
 from app.providers.base import BaseProvider, ProviderRequest, ProviderResponse
@@ -142,22 +143,37 @@ class OpenRouterProvider(BaseProvider):
                 },
             )
 
+        usage = data.get("usage")
+        usage_metrics: Dict[str, int] | None = None
+        if isinstance(usage, dict):
+            usage_metrics = {
+                "prompt_tokens": int(usage.get("prompt_tokens", 0)),
+                "completion_tokens": int(usage.get("completion_tokens", 0)),
+                "total_tokens": int(usage.get("total_tokens", 0)),
+            }
+
+        output: Dict[str, object] = {
+            "mode": "live",
+            "model": self.settings.model,
+            "response_id": data.get("id"),
+            "output_text": output_text,
+            "raw": data,
+        }
+        if usage_metrics is not None:
+            output["usage"] = usage_metrics
+
         return ProviderResponse(
             provider=self.name,
             status="completed",
-            output={
-                "mode": "live",
-                "model": self.settings.model,
-                "response_id": data.get("id"),
-                "output_text": output_text,
-                "raw": data,
-            },
+            output=output,
         )
 
 
 def _http_failure_type(status_code: int) -> str:
     if status_code == 429:
         return "rate_limit"
+    if status_code == 402:
+        return "insufficient_credits"
     if status_code in {401, 403}:
         return "authorization"
     if status_code in {400, 404, 422}:

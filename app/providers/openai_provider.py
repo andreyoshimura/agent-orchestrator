@@ -139,6 +139,8 @@ class OpenAIProvider(BaseProvider):
 def _http_failure_type(status_code: int) -> str:
     if status_code == 429:
         return "rate_limit"
+    if status_code == 402:
+        return "insufficient_credits"
     if status_code in {401, 403}:
         return "authorization"
     if status_code in {400, 404, 422}:

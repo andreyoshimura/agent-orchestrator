@@ -381,6 +381,105 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(response.output["failure_type"], "temporary")
         self.assertIn("provider_internal_error", response.output["reason"])
 
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_classifies_402_as_insufficient_credits(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = HTTPError(url="", code=402, msg="Payment Required", hdrs=None, fp=BytesIO(b""))  # type: ignore[arg-type]
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-4", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.output["failure_type"], "insufficient_credits")
+
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_classifies_402_as_insufficient_credits(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = HTTPError(url="", code=402, msg="Payment Required", hdrs=None, fp=BytesIO(b""))  # type: ignore[arg-type]
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-3", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.output["failure_type"], "insufficient_credits")
+
+    @patch("app.providers.gemini_provider.urllib_request.urlopen")
+    def test_gemini_provider_classifies_402_as_insufficient_credits(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = HTTPError(url="", code=402, msg="Payment Required", hdrs=None, fp=BytesIO(b""))  # type: ignore[arg-type]
+        provider = get_provider(
+            "gemini",
+            ProviderSettings(name="gemini", enabled=True, model="gemini-pro", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.output["failure_type"], "insufficient_credits")
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_classifies_402_as_insufficient_credits(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = HTTPError(url="", code=402, msg="Payment Required", hdrs=None, fp=BytesIO(b""))  # type: ignore[arg-type]
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.output["failure_type"], "insufficient_credits")
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_extracts_usage_metrics(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"id":"gen_x","choices":[{"message":{"content":"ok"}}],'
+            b'"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        usage = response.output.get("usage")
+        self.assertEqual(usage, {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15})
+
+    @patch("app.providers.openrouter_provider.urllib_request.urlopen")
+    def test_openrouter_provider_omits_usage_when_absent(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"gen_x","choices":[{"message":{"content":"ok"}}]}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "openrouter",
+            ProviderSettings(name="openrouter", enabled=True, model="openrouter-model", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        self.assertNotIn("usage", response.output)
+
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_uses_provider_max_tokens_from_metadata(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"r","content":[{"type":"text","text":"ok"}]}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-3", api_key="secret", api_base=""),
+        )
+        provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test", "provider_max_tokens": 512}))
+        _, kwargs = mock_urlopen.call_args
+        req = mock_urlopen.call_args[0][0]
+        payload = __import__("json").loads(req.data.decode("utf-8"))
+        self.assertEqual(payload["max_tokens"], 512)
+
+    @patch("app.providers.gemini_provider.urllib_request.urlopen")
+    def test_gemini_provider_uses_provider_max_tokens_from_metadata(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "gemini",
+            ProviderSettings(name="gemini", enabled=True, model="gemini-pro", api_key="secret", api_base=""),
+        )
+        provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test", "provider_max_tokens": 4096}))
+        req = mock_urlopen.call_args[0][0]
+        payload = __import__("json").loads(req.data.decode("utf-8"))
+        self.assertEqual(payload["generationConfig"]["maxOutputTokens"], 4096)
+
 
 if __name__ == "__main__":
     unittest.main()

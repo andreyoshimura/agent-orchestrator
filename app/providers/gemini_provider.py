@@ -35,6 +35,7 @@ class GeminiProvider(BaseProvider):
         url = f"{endpoint}?{urllib_parse.urlencode({'key': self.settings.api_key})}"
         payload = json.dumps({
             "contents": [{"parts": [{"text": request.prompt}]}],
+            "generationConfig": {"maxOutputTokens": _max_tokens(request.metadata.get("provider_max_tokens", 2048))},
         }).encode("utf-8")
         req = urllib_request.Request(
             url,
@@ -146,11 +147,23 @@ class GeminiProvider(BaseProvider):
 def _http_failure_type(status_code: int) -> str:
     if status_code == 429:
         return "rate_limit"
+    if status_code == 402:
+        return "insufficient_credits"
     if status_code in {401, 403}:
         return "authorization"
     if status_code in {400, 404, 422}:
         return "invalid_request"
     return "temporary"
+
+
+def _max_tokens(raw_value: object, default: int = 2048) -> int:
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+    if value <= 0:
+        return default
+    return value
 
 
 def _timeout_seconds(raw_value: object, default: int = 30) -> int:

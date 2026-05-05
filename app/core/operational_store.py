@@ -28,14 +28,17 @@ class OperationalStore:
             cache_context=cache_context,
         )
 
+        provider_result = output.get("provider_result", {})
+        provider_usage = _extract_provider_usage(provider_result)
         state_payload = {
             "task_type": task_type,
             "project_id": project_id,
             "selected_files": output.get("local_plan", {}).get("selected_files", []),
-            "provider": output.get("provider_result", {}).get("provider"),
-            "status": output.get("provider_result", {}).get("status"),
+            "provider": provider_result.get("provider"),
+            "status": provider_result.get("status"),
             "provider_attempts": output.get("provider_attempts", []),
             "execution_metrics": output.get("execution_metrics", {}),
+            "provider_usage": provider_usage,
         }
         cache_payload = {
             "task_type": task_type,
@@ -43,16 +46,17 @@ class OperationalStore:
             "payload": payload,
             "cache_context": cache_context or {},
             "result": {
-                "provider": output.get("provider_result", {}).get("provider"),
-                "status": output.get("provider_result", {}).get("status"),
+                "provider": provider_result.get("provider"),
+                "status": provider_result.get("status"),
                 "output": output,
             },
             "summary": {
                 "selected_files": output.get("local_plan", {}).get("selected_files", []),
-                "provider": output.get("provider_result", {}).get("provider"),
-                "status": output.get("provider_result", {}).get("status"),
+                "provider": provider_result.get("provider"),
+                "status": provider_result.get("status"),
                 "provider_attempts": output.get("provider_attempts", []),
                 "execution_metrics": output.get("execution_metrics", {}),
+                "provider_usage": provider_usage,
             },
         }
 
@@ -192,6 +196,23 @@ class OperationalStore:
 
 def _slug(value: str) -> str:
     return value.replace("-", "_").replace("/", "_")
+
+
+def _extract_provider_usage(provider_result: Dict[str, Any]) -> Dict[str, int] | None:
+    output = provider_result.get("output")
+    if not isinstance(output, dict):
+        return None
+    usage = output.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    try:
+        return {
+            "prompt_tokens": int(usage.get("prompt_tokens", 0)),
+            "completion_tokens": int(usage.get("completion_tokens", 0)),
+            "total_tokens": int(usage.get("total_tokens", 0)),
+        }
+    except (TypeError, ValueError):
+        return None
 
 
 def _increment_counter(container: Any, key: str) -> Dict[str, int]:

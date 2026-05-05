@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 
 RETRYABLE_FAILURE_TYPES = {"temporary", "rate_limit", "network"}
-FALLBACK_FAILURE_TYPES = {"temporary", "rate_limit", "network", "configuration", "provider_unavailable"}
+FALLBACK_FAILURE_TYPES = {"temporary", "rate_limit", "network", "configuration", "provider_unavailable", "insufficient_credits"}
 TERMINAL_FAILURE_TYPES = {"invalid_request", "authorization", "fatal"}
 
 

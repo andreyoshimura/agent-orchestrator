@@ -33,7 +33,7 @@ class ClaudeProvider(BaseProvider):
         url = self.settings.api_base or "https://api.anthropic.com/v1/messages"
         payload = json.dumps({
             "model": self.settings.model,
-            "max_tokens": 1024,
+            "max_tokens": _max_tokens(request.metadata.get("provider_max_tokens", 1024)),
             "messages": [{"role": "user", "content": request.prompt}],
         }).encode("utf-8")
         req = urllib_request.Request(
@@ -147,11 +147,23 @@ class ClaudeProvider(BaseProvider):
 def _http_failure_type(status_code: int) -> str:
     if status_code == 429:
         return "rate_limit"
+    if status_code == 402:
+        return "insufficient_credits"
     if status_code in {401, 403}:
         return "authorization"
     if status_code in {400, 404, 422}:
         return "invalid_request"
     return "temporary"
+
+
+def _max_tokens(raw_value: object, default: int = 1024) -> int:
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+    if value <= 0:
+        return default
+    return value
 
 
 def _timeout_seconds(raw_value: object, default: int = 30) -> int:

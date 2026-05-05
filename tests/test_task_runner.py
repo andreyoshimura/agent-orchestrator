@@ -949,6 +949,67 @@ class TaskRunnerTest(unittest.TestCase):
                 _restore_env("AI_TARGET_REPO", old_target)
 
 
+    def test_router_reads_provider_max_tokens_from_execution_config(self) -> None:
+        router = Router({
+            "review-file": {
+                "preferred": "claude",
+                "fallback": [],
+                "execution": {"provider_max_tokens": 512},
+            }
+        })
+        decision = router.decide("review-file")
+        self.assertEqual(decision.provider_max_tokens, 512)
+
+    def test_router_defaults_provider_max_tokens_to_2048(self) -> None:
+        router = Router({"review-file": {"preferred": "claude", "fallback": []}})
+        decision = router.decide("review-file")
+        self.assertEqual(decision.provider_max_tokens, 2048)
+
+    @patch.object(TaskRunner, "_execute_provider")
+    def test_run_passes_provider_max_tokens_to_execute_provider(self, mock_execute_provider) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root = Path(tmpdir) / "profiles"
+            create_test_project_profile(projects_root, "demo")
+            repo_root = Path(tmpdir) / "repo"
+            repo_root.mkdir()
+            (repo_root / "engine.py").write_text("print('engine')\n", encoding="utf-8")
+
+            mock_execute_provider.return_value = {
+                "provider": "claude",
+                "status": "stub",
+                "output": {"mode": "stub", "metadata": {"provider_max_tokens": 4096}},
+            }
+
+            old_root = os.environ.get("AI_PROJECTS_ROOT")
+            old_project = os.environ.get("AI_DEFAULT_PROJECT")
+            old_target = os.environ.get("AI_TARGET_REPO_ALT")
+            try:
+                os.environ["AI_PROJECTS_ROOT"] = str(projects_root)
+                os.environ["AI_DEFAULT_PROJECT"] = "demo"
+                os.environ["AI_TARGET_REPO_ALT"] = str(repo_root)
+
+                router = Router({
+                    "review-file": {
+                        "preferred": "claude",
+                        "fallback": [],
+                        "execution": {"provider_max_tokens": 4096},
+                    }
+                })
+                runner = TaskRunner(
+                    router=router,
+                    budget_manager=BudgetManager({}),
+                    provider_settings={"claude": ProviderSettings(name="claude", enabled=True, model="m", api_key="k", api_base="")},
+                )
+                runner.run(TaskRequest(task_type="review-file", payload={"project_id": "demo", "query": "engine", "objective": "test"}))
+
+                _, kwargs = mock_execute_provider.call_args
+                self.assertEqual(kwargs.get("provider_max_tokens"), 4096)
+            finally:
+                _restore_env("AI_PROJECTS_ROOT", old_root)
+                _restore_env("AI_DEFAULT_PROJECT", old_project)
+                _restore_env("AI_TARGET_REPO_ALT", old_target)
+
+
 def _restore_env(name: str, value: str | None) -> None:
     if value is None:
         os.environ.pop(name, None)
