@@ -30,6 +30,16 @@ echo "[AI-BUNDLE] short bundle ready: $SHORT_OUT"
   echo
   echo "## SESSION_STATE"
   cat .ai_context/SESSION_STATE.md
+  echo
+  echo "## DOCS INDEX"
+  echo
+  for doc in docs/architecture.md docs/operations.md docs/roadmap.md docs/checklist.md docs/references.md; do
+    if [[ -f "$doc" ]]; then
+      echo "### $doc"
+      cat "$doc"
+      echo
+    fi
+  done
 } > "$FULL_OUT"
 
 echo "[AI-BUNDLE] full bundle generated: $FULL_OUT"

@@ -280,3 +280,31 @@ Do not confuse roadmap phases below with AI-context infrastructure phases.
   - tornar `provider_max_tokens` configurável por tarefa no `routing.<task>.execution`
   - classificar `HTTP 402` como falha operacional específica (crédito insuficiente)
   - persistir métricas de custo/tokens do OpenRouter no `OperationalStore` para diagnóstico diário
+
+## Checkpoint final desta sessão
+
+- data do checkpoint: `2026-05-04`
+- commit: pendente
+- remoto: pendente push
+- bloco concluído:
+  - `provider_max_tokens` por tarefa no `routing.<task>.execution` — flui via `RouteDecision` até cada provider
+  - HTTP `402` mapeado para `insufficient_credits` em todos os providers; adicionado a `FALLBACK_FAILURE_TYPES`
+  - usage metrics do OpenRouter (`prompt_tokens`, `completion_tokens`, `total_tokens`) extraídos e incluídos no `output`
+  - `OperationalStore.persist_task_result` extrai `provider_usage` e acumula em `provider_usage_metrics_{date}`
+  - `diagnose-orchestrator` expõe `provider_usage_telemetry` no bloco `storage` e nos checks do modo `--health-only`
+  - `AI_PROACTIVE_SWITCH_ALERT_THRESHOLD` (default 20) adicionado; sinal `proactive_switches_high` no `health_summary`
+  - docs reorganizados em `docs/` (architecture, operations, roadmap, checklist, references, bootstrap, ai workflows)
+  - README reescrito em ~45 linhas
+  - `AI_BUNDLE_SHORT.md` e `generate_ai_bundle.sh` atualizados para referenciar nova estrutura de docs
+  - target_repo_not_configured e cache_index_inconsistent eliminados do healthcheck
+  - `.env` carregado como fallback (sem sobrescrever vars já exportadas) em `task.sh` e `healthcheck.sh`
+  - `purge-cache` exposto em `task.sh` com `CacheStore.purge_unindexed()`
+- evidência de validação:
+  - `150` testes passando
+  - `healthcheck --all --strict` retornando `ok` sem sinais
+  - `inspect-task review-file` executando sem erros
+- onde continuar depois:
+  - refinar threshold de `provider_max_tokens` por profile/model
+  - adicionar usage telemetry para providers além do OpenRouter (Claude, Gemini, OpenAI)
+  - alertas de custo/token diário no `health_summary`
+  - explorar streaming de providers para tarefas longas

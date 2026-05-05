@@ -18,6 +18,14 @@ Uso: contexto minimo para colar em OpenAI, Gemini, Codex ou outro agente.
 4. `.ai_context/AI_SYNC.md`
 5. `.ai_context/SESSION_STATE.md`
 
+## Documentacao
+
+- `docs/architecture.md` — componentes, pipeline, camadas
+- `docs/operations.md` — comandos, env vars, routing
+- `docs/roadmap.md` — fases e proximas prioridades
+- `docs/checklist.md` — checklist pre/pos sessao
+- `docs/references.md` — providers, configs, env vars
+
 ## Comandos seguros
 
 ```bash

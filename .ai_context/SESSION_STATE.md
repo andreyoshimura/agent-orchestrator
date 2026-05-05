@@ -2,14 +2,19 @@
 
 ## Ultima atualizacao
 
-- timestamp_local: 2026-04-27 16:58:02
-- timestamp_utc: 2026-04-27T19:58:02Z
+- timestamp_local: 2026-05-04
+- timestamp_utc: 2026-05-04T00:00:00Z
 
 ## Resumo da ultima sessao
 
-- Infraestrutura IA completa ate Fase 4; entrypoints antigos integrados: CODEX_BOOTSTRAP, STATUS, ROADMAP, README e scripts/status; pendencias operacionais: target_repo_not_configured e cache_index_inconsistent no healthcheck.
+- `provider_max_tokens` por tarefa, HTTP 402 → `insufficient_credits`, usage telemetry (OpenRouter), `provider_usage_telemetry` diário em `diagnose-orchestrator`, sinal `proactive_switches_high`, docs reorganizados em `docs/`, README reescrito, bundles atualizados, healthcheck ok (150 testes).
+
+## Proximo foco
+
+- usage telemetry para Claude/Gemini/OpenAI
+- alertas de custo/token diário no health_summary
+- refinar provider_max_tokens por profile/model
 
 ## Observacao
 
-Arquivo atualizado automaticamente via script de encerramento.
-
+Arquivo atualizado manualmente no encerramento da sessao 2026-05-04.
