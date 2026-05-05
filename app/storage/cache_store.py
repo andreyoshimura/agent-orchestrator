@@ -86,6 +86,17 @@ class CacheStore:
             return {}
         return loaded
 
+    def purge_unindexed(self) -> dict:
+        """Remove .txt files not referenced by any index entry."""
+        index = self._load_index()
+        indexed_digests = set(index.keys())
+        removed = 0
+        for path in self.base_dir.glob("*.txt"):
+            if path.stem not in indexed_digests:
+                path.unlink()
+                removed += 1
+        return {"removed": removed, "indexed": len(indexed_digests)}
+
     def _save_index(self, index: dict) -> None:
         temp_path: str | None = None
         try:

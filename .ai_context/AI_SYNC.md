@@ -11,7 +11,7 @@ Todas as IAs devem usar a mesma ordem de contexto:
 3. `.ai_context/TASK_FORMATS.md`
 4. `.ai_context/AI_SYNC.md`
 5. `.ai_context/SESSION_STATE.md`, se existir
-6. `docs/AI_CONTEXT_PROGRESS.md`, se existir
+6. `docs/ai_context_progress.md`, se existir
 
 ## Estado oficial
 
@@ -28,8 +28,8 @@ Todas as IAs devem usar a mesma ordem de contexto:
 - Guardrails: `.ai_context/GUARDRAILS.md`
 - Formato de resposta: `.ai_context/TASK_FORMATS.md`
 - Estado da sessao: `.ai_context/SESSION_STATE.md`
-- Progresso da infraestrutura IA: `docs/AI_CONTEXT_PROGRESS.md`
-- Workflow humano: `docs/AI_SESSION_WORKFLOW.md`
+- Progresso da infraestrutura IA: `docs/ai_context_progress.md`
+- Workflow humano: `docs/ai_session_workflow.md`
 - Documentacao ampla do projeto: `README.md`
 
 ## Politica para agentes

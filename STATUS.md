@@ -6,8 +6,8 @@ For daily AI continuity, also check:
 
 - `.ai_context/SESSION_STATE.md`
 - `.ai_context/AI_SYNC.md`
-- `docs/AI_CONTEXT_PROGRESS.md`
-- `docs/AI_SESSION_WORKFLOW.md`
+- `docs/ai_context_progress.md`
+- `docs/ai_session_workflow.md`
 
 This file remains the development status and technical checkpoint log.
 The `.ai_context/` files are the shared working context for OpenAI, Gemini, Codex and other agents.
@@ -179,7 +179,7 @@ The `.ai_context/` files are the shared working context for OpenAI, Gemini, Code
 
 ## Arquivos-chave para retomar rápido
 
-- `ROADMAP.md`
+- `docs/roadmap.md`
 - `STATUS.md`
 - `app/core/project_loader.py`
 - `config/routing.yaml`
@@ -201,7 +201,7 @@ The `.ai_context/` files are the shared working context for OpenAI, Gemini, Code
   - preview operacional da decisão em `inspect-task` e `task_cli` via `selection_preview`
   - telemetria diária de trocas proativas em `diagnose-orchestrator`
   - persistência da telemetria no `OperationalStore`
-  - documentação atualizada em `README.md`, `STATUS.md` e `ROADMAP.md`
+  - documentação atualizada em `README.md`, `STATUS.md` e `docs/roadmap.md`
 - onde paramos:
   - o fluxo funcional já está pronto e publicado no remoto
   - o próximo trabalho, se retomarmos, é refinar a política de troca por modelo/tarefa e evoluir o alerta/telemetria de uso

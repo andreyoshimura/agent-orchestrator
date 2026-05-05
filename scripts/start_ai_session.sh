@@ -50,7 +50,7 @@ Leia primeiro:
 - .ai_context/CONTEXT_MINIMAL.md
 - .ai_context/GUARDRAILS.md
 - .ai_context/TASK_FORMATS.md
-- docs/AI_CONTEXT_PROGRESS.md
+- docs/ai_context_progress.md
 
 Antes de alterar qualquer coisa, me diga:
 - estado atual

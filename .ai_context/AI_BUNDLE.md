@@ -10,13 +10,13 @@ Uso: contexto completo para sessoes mais longas ou quando a IA precisa de mais i
 
 Consultar:
 
-- docs/AI_CONTEXT_PROGRESS.md
+- docs/ai_context_progress.md
 
 ## Workflow
 
 Consultar:
 
-- docs/AI_SESSION_WORKFLOW.md
+- docs/ai_session_workflow.md
 
 ## Politica de uso
 

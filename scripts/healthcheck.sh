@@ -4,6 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  while IFS= read -r _line || [[ -n "$_line" ]]; do
+    [[ "$_line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${_line//[[:space:]]/}" ]] && continue
+    _varname="${_line%%=*}"
+    _varname="${_varname#"${_varname%%[![:space:]]*}"}"
+    [[ -z "$_varname" ]] && continue
+    if [[ -z "${!_varname+x}" ]]; then
+      export "$_line" 2>/dev/null || true
+    fi
+  done < "${ROOT_DIR}/.env"
+  unset _line _varname
+fi
+
 usage() {
   cat <<'EOF'
 usage: scripts/healthcheck.sh [--inspect-project|--all] [--compact] [--strict] [--quiet] [--meta] [--meta-fields <csv>] [--meta-drop-nulls] [--meta-flatten] [--meta-prefix <text>] [--output <file>|--output-dir <dir>] [--latest-link] [--latest-link-name <name>] [project-id]

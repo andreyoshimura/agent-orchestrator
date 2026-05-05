@@ -5,6 +5,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
+
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  while IFS= read -r _line || [[ -n "$_line" ]]; do
+    [[ "$_line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${_line//[[:space:]]/}" ]] && continue
+    _varname="${_line%%=*}"
+    _varname="${_varname#"${_varname%%[![:space:]]*}"}"
+    [[ -z "$_varname" ]] && continue
+    if [[ -z "${!_varname+x}" ]]; then
+      export "$_line" 2>/dev/null || true
+    fi
+  done < "${ROOT_DIR}/.env"
+  unset _line _varname
+fi
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 run_module() {
@@ -124,6 +138,10 @@ case "${TASK_TYPE}" in
   diagnose-orchestrator)
     # Mostra estado global do orchestrator, budget e persistência local.
     run_module app.commands.diagnose_orchestrator "$@"
+    ;;
+  purge-cache)
+    # Remove entradas de cache não indexadas (orphans).
+    run_module app.commands.purge_cache
     ;;
   *)
     # Fallback para o roteador genérico.

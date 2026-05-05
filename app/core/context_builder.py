@@ -69,7 +69,7 @@ class ContextBuilder:
         sections: list[str] = []
         parts: list[str] = []
 
-        self._append_document(parts, sections, "GLOBAL_BOOTSTRAP", Path("CODEX_BOOTSTRAP.md"))
+        self._append_document(parts, sections, "GLOBAL_BOOTSTRAP", Path("docs/bootstrap.md"))
         self._append_document(parts, sections, "PROJECT_BOOTSTRAP", profile.bootstrap_path)
         self._append_document(parts, sections, "PROJECT_AGENT_CONTEXT", profile.agent_context_path)
 

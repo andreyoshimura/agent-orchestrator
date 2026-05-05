@@ -43,8 +43,8 @@ Status: concluida
 
 Arquivos criados:
 
-- `docs/AI_CONTEXT_PROGRESS.md`
-- `docs/AI_SESSION_WORKFLOW.md`
+- `docs/ai_context_progress.md`
+- `docs/ai_session_workflow.md`
 
 Resultado:
 
