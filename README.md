@@ -2,6 +2,14 @@
 
 Generic AI agent orchestrator for local repositories. Routes tasks between multiple AI providers (Claude, Gemini, OpenAI, OpenRouter), controls token budget per provider, and keeps project-specific memory isolated in `projects/<project_id>/`.
 
+## Current status
+
+- Functional technical MVP in active hardening
+- Multi-provider routing, fallback, cache, budget and diagnostics are implemented
+- Provider usage telemetry and proactive switch alerts are available
+- Current validation: `150` passing tests
+- Latest published checkpoint: `ce92b343`
+
 ## Quick start
 
 ```bash
@@ -30,17 +38,17 @@ bash scripts/task.sh inspect-budget
 | Document | Purpose |
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | Components, pipeline, data flow, layer separation |
-| [`docs/operations.md`](docs/operations.md) | Commands, scripts, env vars, routing policy |
-| [`docs/roadmap.md`](docs/roadmap.md) | Phases, current status, next priorities |
+| [`docs/operations.md`](docs/operations.md) | Commands, scripts, env vars, routing policy and observability |
+| [`docs/roadmap.md`](docs/roadmap.md) | Current status, completed phases and next priorities |
 | [`docs/checklist.md`](docs/checklist.md) | Operational pre/post session checklist |
 | [`docs/ai_session_workflow.md`](docs/ai_session_workflow.md) | Daily AI session workflow |
 | [`docs/ai_context_progress.md`](docs/ai_context_progress.md) | AI infrastructure phases |
-| [`docs/references.md`](docs/references.md) | Providers, config files, env vars |
+| [`docs/references.md`](docs/references.md) | Providers, config files, env vars and state keys |
 | [`docs/bootstrap.md`](docs/bootstrap.md) | Codex/agent bootstrap instructions |
 
 ## AI context (for agents)
 
-```
+```text
 .ai_context/
   CONTEXT_MINIMAL.md   minimal context for any AI agent
   GUARDRAILS.md        safety rules
