@@ -671,6 +671,87 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertEqual(payload["health_summary"]["status"], "degraded")
             self.assertEqual(exit_code, 2)
 
+    def test_diagnose_orchestrator_reports_provider_usage_telemetry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            op_store = OperationalStore(state_store=state_store, cache_store=cache_store)
+            op_store._record_provider_usage_telemetry(
+                provider_name="openrouter",
+                usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            )
+            op_store._record_provider_usage_telemetry(
+                provider_name="openrouter",
+                usage={"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(diagnose_orchestrator.main, ["diagnose_orchestrator.py"])
+
+            usage = payload["storage"]["provider_usage_telemetry"]
+            self.assertEqual(usage["total_tokens"], 180)
+            entry = usage["by_provider"].get("openrouter", {})
+            self.assertEqual(entry["total_tokens"], 180)
+            self.assertEqual(entry["calls"], 2)
+
+    def test_diagnose_orchestrator_signals_proactive_switches_high_when_above_threshold(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"proactive_switch_metrics_{date.today().isoformat()}",
+                {"date": date.today().isoformat(), "total_switches": 25},
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_PROACTIVE_SWITCH_ALERT_THRESHOLD": "20",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(diagnose_orchestrator.main, ["diagnose_orchestrator.py"])
+
+            self.assertIn("proactive_switches_high", payload["health_summary"]["signals"])
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertEqual(payload["health_summary"]["proactive_switch_count"], 25)
+
+    def test_diagnose_orchestrator_health_only_includes_proactive_switch_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            state_store.save(
+                f"proactive_switch_metrics_{date.today().isoformat()}",
+                {"date": date.today().isoformat(), "total_switches": 5},
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_PROACTIVE_SWITCH_ALERT_THRESHOLD": "20",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py", "--health-only"],
+                        )
+
+            self.assertEqual(payload["checks"]["proactive_switch_count"], 5)
+            self.assertEqual(payload["checks"]["proactive_switch_threshold"], 20)
+            self.assertEqual(payload["health_summary"]["status"], "ok")
+
     def test_diagnose_orchestrator_health_only_compact_outputs_single_line_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)

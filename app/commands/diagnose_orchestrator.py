@@ -7,6 +7,7 @@ from typing import Any
 
 from app.cli.task_cli import _load_yaml, _resolve_daily_limits
 from app.core.budget_manager import BudgetManager
+from app.core.operational_store import OperationalStore
 from app.core.project_loader import load_runtime_project
 from app.storage.cache_store import CacheStore
 from app.storage.state_store import StateStore
@@ -111,10 +112,24 @@ def _budget_alerts(budget_summary: dict[str, Any], threshold_ratio: float) -> li
     return alerts
 
 
+def _proactive_switch_alert_threshold() -> int:
+    default = 20
+    raw = os.getenv("AI_PROACTIVE_SWITCH_ALERT_THRESHOLD")
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default
+    return max(parsed, 1)
+
+
 def _build_health_summary(
     project_status: dict[str, Any],
     storage_health: dict[str, Any],
     budget_alerts: list[dict[str, Any]],
+    proactive_switch_total: int = 0,
+    proactive_switch_threshold: int = 20,
 ) -> dict[str, Any]:
     signals: list[str] = []
     if project_status.get("status") != "ok":
@@ -127,12 +142,15 @@ def _build_health_summary(
     low_budget_alerts = sum(1 for item in budget_alerts if item.get("severity") == "low_remaining")
     if low_budget_alerts > 0:
         signals.append("budget_low_remaining")
+    if proactive_switch_total >= proactive_switch_threshold:
+        signals.append("proactive_switches_high")
     return {
         "status": "degraded" if signals else "ok",
         "signals": signals,
         "budget_alert_count": len(budget_alerts),
         "budget_exhausted_count": exhausted_alerts,
         "budget_low_remaining_count": low_budget_alerts,
+        "proactive_switch_count": proactive_switch_total,
     }
 
 
@@ -190,11 +208,21 @@ def main() -> int:
         ),
     }
 
+    op_store = OperationalStore(state_store=state_store, cache_store=cache_store)
     budget_summary = budget_manager.summary()
     alert_threshold_ratio = _budget_alert_threshold_ratio()
     budget_summary["alert_threshold_ratio"] = alert_threshold_ratio
     budget_summary["alerts"] = _budget_alerts(budget_summary, threshold_ratio=alert_threshold_ratio)
-    health_summary = _build_health_summary(project_status, storage_health, budget_summary["alerts"])
+    switch_telemetry = _proactive_switch_telemetry(state_store)
+    switch_threshold = _proactive_switch_alert_threshold()
+    usage_telemetry = op_store.provider_usage_summary()
+    health_summary = _build_health_summary(
+        project_status,
+        storage_health,
+        budget_summary["alerts"],
+        proactive_switch_total=int(switch_telemetry.get("total_switches", 0)),
+        proactive_switch_threshold=switch_threshold,
+    )
 
     if health_only:
         _print_payload({
@@ -208,6 +236,8 @@ def main() -> int:
             "checks": {
                 "cache_index_consistent": storage_health["cache_index_consistent"],
                 "budget_alert_count": len(budget_summary["alerts"]),
+                "proactive_switch_count": int(switch_telemetry.get("total_switches", 0)),
+                "proactive_switch_threshold": switch_threshold,
             },
         }, compact=compact)
         if fail_on_degraded and health_summary.get("status") == "degraded":
@@ -231,7 +261,9 @@ def main() -> int:
                 for item in inspect_cache_entries[:5]
             ],
             "recent_task_status_summary": _recent_task_status_summary(state_store),
-            "proactive_switch_telemetry": _proactive_switch_telemetry(state_store),
+            "proactive_switch_telemetry": switch_telemetry,
+            "proactive_switch_threshold": switch_threshold,
+            "provider_usage_telemetry": usage_telemetry,
             "storage_health": storage_health,
             "recent_task_states": _recent_task_states(state_store),
         },

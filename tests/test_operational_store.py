@@ -297,6 +297,49 @@ class OperationalStoreTest(unittest.TestCase):
             self.assertIsInstance(raw, dict)
             self.assertIsNone(raw.get("provider_usage"))
 
+    def test_persist_task_result_accumulates_provider_usage_telemetry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = OperationalStore(
+                state_store=StateStore(base_dir=f"{tmpdir}/state"),
+                cache_store=CacheStore(base_dir=f"{tmpdir}/cache"),
+            )
+            output = {
+                "provider_result": {
+                    "provider": "openrouter",
+                    "status": "completed",
+                    "output": {
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                    },
+                },
+            }
+            store.persist_task_result("review-file", "demo", {}, output)
+            store.persist_task_result("explain-file", "demo", {"query": "x"}, output)
+            summary = store.provider_usage_summary()
+            self.assertEqual(summary["total_tokens"], 30)
+            entry = summary["by_provider"].get("openrouter", {})
+            self.assertEqual(entry["prompt_tokens"], 20)
+            self.assertEqual(entry["completion_tokens"], 10)
+            self.assertEqual(entry["total_tokens"], 30)
+            self.assertEqual(entry["calls"], 2)
+
+    def test_persist_task_result_does_not_accumulate_usage_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = OperationalStore(
+                state_store=StateStore(base_dir=f"{tmpdir}/state"),
+                cache_store=CacheStore(base_dir=f"{tmpdir}/cache"),
+            )
+            output = {
+                "provider_result": {
+                    "provider": "claude",
+                    "status": "completed",
+                    "output": {"output_text": "ok"},
+                },
+            }
+            store.persist_task_result("review-file", "demo", {}, output)
+            summary = store.provider_usage_summary()
+            self.assertEqual(summary["total_tokens"], 0)
+            self.assertEqual(summary["by_provider"], {})
+
     def test_cache_store_tracks_key_index_and_supports_prefix_listing(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_store = CacheStore(base_dir=f"{tmpdir}/cache")

@@ -63,6 +63,10 @@ class OperationalStore:
         self.state_store.save(state_key, state_payload)
         self.cache_store.set(cache_key, json.dumps(cache_payload, ensure_ascii=False, indent=2))
         self._record_proactive_switch_telemetry(task_type=task_type, output=output)
+        if provider_usage is not None:
+            provider_name = str(provider_result.get("provider", "")).strip()
+            if provider_name:
+                self._record_provider_usage_telemetry(provider_name=provider_name, usage=provider_usage)
         return {
             "state_key": state_key,
             "cache_key": cache_key,
@@ -192,6 +196,41 @@ class OperationalStore:
 
     def _current_date(self) -> str:
         return date.today().isoformat()
+
+    def provider_usage_summary(self, current_date: str | None = None) -> Dict[str, Any]:
+        key = f"provider_usage_metrics_{current_date or self._current_date()}"
+        payload = self.state_store.load(key)
+        if not isinstance(payload, dict):
+            payload = {}
+        return {
+            "date": payload.get("date", current_date or self._current_date()),
+            "total_tokens": int(payload.get("total_tokens", 0)),
+            "by_provider": payload.get("by_provider", {}),
+        }
+
+    def _record_provider_usage_telemetry(self, provider_name: str, usage: Dict[str, int]) -> None:
+        key = f"provider_usage_metrics_{self._current_date()}"
+        telemetry = self.state_store.load(key)
+        if not isinstance(telemetry, dict):
+            telemetry = {}
+        telemetry["date"] = self._current_date()
+        prompt_tokens = int(usage.get("prompt_tokens", 0))
+        completion_tokens = int(usage.get("completion_tokens", 0))
+        total_tokens = int(usage.get("total_tokens", 0))
+        telemetry["total_tokens"] = int(telemetry.get("total_tokens", 0)) + total_tokens
+        by_provider = telemetry.get("by_provider", {})
+        if not isinstance(by_provider, dict):
+            by_provider = {}
+        entry = by_provider.get(provider_name, {})
+        if not isinstance(entry, dict):
+            entry = {}
+        entry["prompt_tokens"] = int(entry.get("prompt_tokens", 0)) + prompt_tokens
+        entry["completion_tokens"] = int(entry.get("completion_tokens", 0)) + completion_tokens
+        entry["total_tokens"] = int(entry.get("total_tokens", 0)) + total_tokens
+        entry["calls"] = int(entry.get("calls", 0)) + 1
+        by_provider[provider_name] = entry
+        telemetry["by_provider"] = by_provider
+        self.state_store.save(key, telemetry)
 
 
 def _slug(value: str) -> str:
