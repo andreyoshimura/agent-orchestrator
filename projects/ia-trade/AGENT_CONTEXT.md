@@ -30,6 +30,19 @@ Do not assume phase promotion unless there is explicit evidence.
 
 ---
 
+## Calibration diagnosis rule
+
+Before tuning parameters, check whether the issue is structural:
+asset, timeframe, regime, entry, exit, slippage, data quality, or sample size.
+
+Avoid baseline changes without a stated likely cause.
+If uncertain, prefer shadow experiments.
+
+For calibration tasks, report:
+evidence, likely cause, allowed action, forbidden action, and promotion criterion.
+
+---
+
 ## Read these files first
 
 Before doing deeper work, read these files first:
