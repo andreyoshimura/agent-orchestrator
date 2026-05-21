@@ -58,6 +58,7 @@ projects/<project_id>/
 | `AI_INSPECT_CACHE_TTL_SEC` | — | TTL for inspect-task cache entries |
 | `AI_BUDGET_ALERT_THRESHOLD_RATIO` | `0.1` | Remaining-budget ratio that triggers budget alert signals |
 | `AI_PROACTIVE_SWITCH_ALERT_THRESHOLD` | `20` | Daily proactive switch count that marks health as degraded |
+| `AI_DAILY_TOKEN_ALERT_THRESHOLD` | `0` (disabled) | Daily total-token count that marks health as degraded; `0` disables the alert |
 | `BUDGET_<PROVIDER>_DAILY_USD` | — | Daily budget cap per provider |
 | `MAX_CONTEXT_FILES_<PROVIDER>` | — | Max files sent to each provider |
 | `<PROVIDER>_ENABLED` | — | Toggle provider on/off |

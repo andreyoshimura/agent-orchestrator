@@ -752,6 +752,84 @@ class CommandEntrypointsTest(unittest.TestCase):
             self.assertEqual(payload["checks"]["proactive_switch_threshold"], 20)
             self.assertEqual(payload["health_summary"]["status"], "ok")
 
+    def test_diagnose_orchestrator_signals_daily_tokens_high_when_above_threshold(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            op_store = OperationalStore(state_store=state_store, cache_store=cache_store)
+            op_store._record_provider_usage_telemetry(
+                provider_name="claude",
+                usage={"prompt_tokens": 4000, "completion_tokens": 2000, "total_tokens": 6000},
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_DAILY_TOKEN_ALERT_THRESHOLD": "5000",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(diagnose_orchestrator.main, ["diagnose_orchestrator.py"])
+
+            self.assertIn("daily_tokens_high", payload["health_summary"]["signals"])
+            self.assertEqual(payload["health_summary"]["status"], "degraded")
+            self.assertEqual(payload["health_summary"]["daily_token_total"], 6000)
+            self.assertEqual(payload["health_summary"]["daily_token_threshold"], 5000)
+
+    def test_diagnose_orchestrator_keeps_status_ok_when_daily_token_threshold_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            op_store = OperationalStore(state_store=state_store, cache_store=cache_store)
+            op_store._record_provider_usage_telemetry(
+                provider_name="claude",
+                usage={"prompt_tokens": 4000, "completion_tokens": 2000, "total_tokens": 6000},
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(diagnose_orchestrator.main, ["diagnose_orchestrator.py"])
+
+            self.assertNotIn("daily_tokens_high", payload["health_summary"]["signals"])
+            self.assertEqual(payload["health_summary"]["daily_token_total"], 6000)
+            self.assertEqual(payload["health_summary"]["daily_token_threshold"], 0)
+
+    def test_diagnose_orchestrator_health_only_includes_daily_token_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            projects_root, repo_root = _create_demo_project(tmpdir)
+            state_store = StateStore(base_dir=f"{tmpdir}/state")
+            cache_store = CacheStore(base_dir=f"{tmpdir}/cache")
+            op_store = OperationalStore(state_store=state_store, cache_store=cache_store)
+            op_store._record_provider_usage_telemetry(
+                provider_name="openai",
+                usage={"prompt_tokens": 700, "completion_tokens": 300, "total_tokens": 1000},
+            )
+
+            with _patched_env({
+                "AI_PROJECTS_ROOT": str(projects_root),
+                "AI_DEFAULT_PROJECT": "demo",
+                "AI_TARGET_REPO_ALT": str(repo_root),
+                "AI_DAILY_TOKEN_ALERT_THRESHOLD": "5000",
+            }):
+                with patch("app.commands.diagnose_orchestrator.StateStore", return_value=state_store):
+                    with patch("app.commands.diagnose_orchestrator.CacheStore", return_value=cache_store):
+                        payload = _run_command(
+                            diagnose_orchestrator.main,
+                            ["diagnose_orchestrator.py", "--health-only"],
+                        )
+
+            self.assertEqual(payload["checks"]["daily_token_total"], 1000)
+            self.assertEqual(payload["checks"]["daily_token_threshold"], 5000)
+            self.assertEqual(payload["health_summary"]["status"], "ok")
+
     def test_diagnose_orchestrator_health_only_compact_outputs_single_line_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             projects_root, repo_root = _create_demo_project(tmpdir)

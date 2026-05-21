@@ -112,6 +112,18 @@ def _budget_alerts(budget_summary: dict[str, Any], threshold_ratio: float) -> li
     return alerts
 
 
+def _daily_token_alert_threshold() -> int:
+    default = 0
+    raw = os.getenv("AI_DAILY_TOKEN_ALERT_THRESHOLD")
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default
+    return max(parsed, 0)
+
+
 def _proactive_switch_alert_threshold() -> int:
     default = 20
     raw = os.getenv("AI_PROACTIVE_SWITCH_ALERT_THRESHOLD")
@@ -130,6 +142,8 @@ def _build_health_summary(
     budget_alerts: list[dict[str, Any]],
     proactive_switch_total: int = 0,
     proactive_switch_threshold: int = 20,
+    daily_token_total: int = 0,
+    daily_token_threshold: int = 0,
 ) -> dict[str, Any]:
     signals: list[str] = []
     if project_status.get("status") != "ok":
@@ -144,6 +158,8 @@ def _build_health_summary(
         signals.append("budget_low_remaining")
     if proactive_switch_total >= proactive_switch_threshold:
         signals.append("proactive_switches_high")
+    if daily_token_threshold > 0 and daily_token_total >= daily_token_threshold:
+        signals.append("daily_tokens_high")
     return {
         "status": "degraded" if signals else "ok",
         "signals": signals,
@@ -151,6 +167,8 @@ def _build_health_summary(
         "budget_exhausted_count": exhausted_alerts,
         "budget_low_remaining_count": low_budget_alerts,
         "proactive_switch_count": proactive_switch_total,
+        "daily_token_total": daily_token_total,
+        "daily_token_threshold": daily_token_threshold,
     }
 
 
@@ -216,12 +234,16 @@ def main() -> int:
     switch_telemetry = _proactive_switch_telemetry(state_store)
     switch_threshold = _proactive_switch_alert_threshold()
     usage_telemetry = op_store.provider_usage_summary()
+    daily_token_total = int(usage_telemetry.get("total_tokens", 0))
+    daily_token_threshold = _daily_token_alert_threshold()
     health_summary = _build_health_summary(
         project_status,
         storage_health,
         budget_summary["alerts"],
         proactive_switch_total=int(switch_telemetry.get("total_switches", 0)),
         proactive_switch_threshold=switch_threshold,
+        daily_token_total=daily_token_total,
+        daily_token_threshold=daily_token_threshold,
     )
 
     if health_only:
@@ -238,6 +260,8 @@ def main() -> int:
                 "budget_alert_count": len(budget_summary["alerts"]),
                 "proactive_switch_count": int(switch_telemetry.get("total_switches", 0)),
                 "proactive_switch_threshold": switch_threshold,
+                "daily_token_total": daily_token_total,
+                "daily_token_threshold": daily_token_threshold,
             },
         }, compact=compact)
         if fail_on_degraded and health_summary.get("status") == "degraded":

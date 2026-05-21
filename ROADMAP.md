@@ -37,25 +37,32 @@ Expandir telemetria de uso de provider além de OpenRouter. Implementar extraç�
 
 ---
 
-### #2 - Adicionar alertas de token/custo ao health_summary
+### #2 - Adicionar alertas de token/custo ao health_summary ✅
 
 **Prioridade**: 🔴 Alta  
-**Status**: ⏳ Pending  
+**Status**: ✅ Completed (2026-05-20)  
 **Deps**: #1 (telemetria)
 
-Integrar sinais de alerta diários para consumo de tokens e custos. Avisos quando próximo do limite configurado.
+Integrar sinais de alerta diários para consumo de tokens. Avisos quando o
+total agregado de tokens do dia ultrapassa um limite configurável.
 
 **Critérios de conclusão**:
-- [ ] Sinais de alerta implementados (`daily_cost_alert`, `daily_tokens_alert`)
-- [ ] Limites configuráveis via `config/routing.yaml`
-- [ ] `health_summary` inclui alertas diários
-- [ ] Testes cobrindo cenários de alerta
+- [x] Sinal `daily_tokens_high` adicionado ao `health_summary.signals`
+- [x] Threshold configurável via `AI_DAILY_TOKEN_ALERT_THRESHOLD` (env var)
+- [x] `daily_token_total` e `daily_token_threshold` expostos no summary
+- [x] `--health-only` inclui `daily_token_total`/`daily_token_threshold` em `checks`
+- [x] Comportamento desabilitado por default (`threshold = 0`) preserva compatibilidade
+- [x] Testes cobrindo cenários acima do limite, desabilitado e health-only (3 novos)
 
 **Arquivos afetados**:
-- `app/core/stores/operational_store.py` (alertas)
-- `app/core/diagnostics/` (health_summary)
-- `config/routing.yaml` (configuração)
-- `tests/integration/` (E2E)
+- `app/commands/diagnose_orchestrator.py` (sinal e checks)
+- `docs/references.md` (env var documentada)
+- `tests/test_command_entrypoints.py` (3 novos testes)
+
+**Notas**:
+- Cost accounting (USD por modelo) ficou fora do escopo desta etapa porque
+  ainda não há catálogo de preços por modelo. Foi promovido para uma tarefa
+  futura que pode partir do total já disponível em `daily_token_total`.
 
 ---
 
