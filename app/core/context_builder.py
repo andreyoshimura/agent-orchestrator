@@ -1,10 +1,13 @@
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
 from app.core.context_manager import ContextManager
 from app.core.file_selector import auto_select_python_files
 from app.core.project_loader import ProjectRuntime
+from app.core.security import ContextSanitizer, Finding, normalize_mode
+from app.storage.audit_log import AuditLog
 
 
 def _safe_read(path: Path, max_chars: int = 12000) -> str:
@@ -50,14 +53,26 @@ class ContextBundle:
     prompt_text: str
     context_text: str
     sections: list[str]
+    security_findings: list[Finding] = field(default_factory=list)
+    blocked_files: list[str] = field(default_factory=list)
 
 
 class ContextBuilder:
-    def __init__(self, runtime_project: ProjectRuntime, max_target_files: int | None = None):
+    def __init__(
+        self,
+        runtime_project: ProjectRuntime,
+        max_target_files: int | None = None,
+        sanitizer: ContextSanitizer | None = None,
+        audit_log: AuditLog | None = None,
+    ):
         self.runtime_project = runtime_project
         self.context_rules = runtime_project.profile.context_rules if isinstance(runtime_project.profile.context_rules, dict) else {}
         default_max = _positive_int(self.context_rules.get("max_target_files"), 5)
         self.max_target_files = max_target_files if max_target_files is not None else default_max
+        self.sanitizer = sanitizer if sanitizer is not None else ContextSanitizer(
+            mode=normalize_mode(os.getenv("AI_CONTEXT_SECURITY_MODE"))
+        )
+        self.audit_log = audit_log
 
     def build(self, task_type: str, payload: dict[str, Any]) -> ContextBundle:
         profile = self.runtime_project.profile
@@ -82,6 +97,8 @@ class ContextBuilder:
                 prompt_text = _safe_read(Path(prompt_path), max_chars=8000)
                 self._append_document(parts, sections, f"PROJECT_PROMPT::{prompt_name}", Path(prompt_path))
 
+        security_findings: list[Finding] = []
+        blocked_files: list[str] = []
         repo_root = self.runtime_project.target_repo
         if repo_root:
             ctx = ContextManager(repo_root=repo_root, max_files=self.max_target_files)
@@ -90,8 +107,19 @@ class ContextBuilder:
                     content = ctx.read_file(relative_path, max_chars=12000)
                 except FileNotFoundError:
                     continue
+                sanitization = self.sanitizer.sanitize(content, source=f"target_file:{relative_path}")
+                if sanitization.findings:
+                    security_findings.extend(sanitization.findings)
+                    self._record_audit_event(
+                        relative_path=relative_path,
+                        findings=sanitization.findings,
+                        blocked=sanitization.blocked,
+                    )
+                if sanitization.blocked:
+                    blocked_files.append(relative_path)
+                    continue
                 sections.append(f"TARGET_FILE::{relative_path}")
-                parts.append(f"## TARGET_FILE::{relative_path}\n{content}")
+                parts.append(f"## TARGET_FILE::{relative_path}\n{sanitization.sanitized_text}")
 
         header = [
             f"task_type: {task_type}",
@@ -114,7 +142,34 @@ class ContextBuilder:
             prompt_text=prompt_text,
             context_text=context_text.strip(),
             sections=sections,
+            security_findings=security_findings,
+            blocked_files=blocked_files,
         )
+
+    def _record_audit_event(
+        self,
+        relative_path: str,
+        findings: list[Finding],
+        blocked: bool,
+    ) -> None:
+        if self.audit_log is None:
+            return
+        self.audit_log.write({
+            "event": "context_security_finding",
+            "project_id": self.runtime_project.profile.project_id,
+            "file": relative_path,
+            "mode": self.sanitizer.mode,
+            "blocked": blocked,
+            "findings": [
+                {
+                    "pattern_id": item.pattern_id,
+                    "category": item.category,
+                    "severity": item.severity,
+                    "line_number": item.line_number,
+                }
+                for item in findings
+            ],
+        })
 
     def _resolve_target_files(self, task_type: str, payload: dict[str, Any], objective: str) -> list[str]:
         task_limit = self._task_file_limit(task_type)

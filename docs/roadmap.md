@@ -66,7 +66,7 @@ Current validation: `150` passing tests
 - Provider usage telemetry: normalized for OpenRouter, Claude, Gemini and OpenAI; cost accounting still pending
 - Streaming provider execution: not yet implemented
 - Product packaging: still closer to local engineering tool than packaged product
-- Context security hardening: needs more explicit guardrails against secret leakage and prompt injection from repository content
+- Context security: `ContextSanitizer` covers known secret families and prompt-injection markers; AuditLog wiring is opt-in (no default sink yet)
 
 ---
 
@@ -172,7 +172,7 @@ Current validation: `150` passing tests
 1. `[x]` Normalize provider usage telemetry across Claude, Gemini and OpenAI
 2. `[x]` Add daily token limit alert signals to `health_summary`
 3. `[x]` Refine `provider_max_tokens` by task/profile/model
-4. `[~]` Harden context security against secret leakage and prompt injection
+4. `[x]` Harden context security against secret leakage and prompt injection
 5. `[~]` Expand file selection beyond Python
 6. `[ ]` Add streaming provider execution for long tasks
 7. `[ ]` Define productized output format for code audit/review

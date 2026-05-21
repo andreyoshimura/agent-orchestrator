@@ -93,26 +93,40 @@ rota.defaults → fallback 2048).
 
 ## 🔒 Fase 2: Segurança & Cobertura (2-3 semanas)
 
-### #4 - Hardening de segurança de contexto
+### #4 - Hardening de segurança de contexto ✅
 
 **Prioridade**: 🔴 Alta  
-**Status**: ⏳ Pending  
+**Status**: ✅ Completed (2026-05-20)  
 **Deps**: Nenhuma
 
-Guardrails contra vazamento de secrets e prompt injection de conteúdo de repositório.
+Guardrails contra vazamento de secrets e prompt-injection vindos do
+**conteúdo dos arquivos do repositório alvo** (TARGET_FILES). Documentos
+gerenciados pela equipe (`docs/`, project memory, prompts) continuam
+intocados — são considerados trusted.
 
 **Critérios de conclusão**:
-- [ ] Detector de secrets integrado ao `ContextManager`
-- [ ] Filtros de prompt injection para conteúdo dinâmico
-- [ ] Logs de bloqueios/sanitização para auditoria
-- [ ] Testes cobrindo padrões comuns (API keys, tokens, SQL)
-- [ ] Documentação de guardrails em `docs/`
+- [x] `ContextSanitizer` (novo módulo `app/core/security.py`) detecta:
+  - secrets (OpenAI, Anthropic, AWS, GitHub, Slack, Google, JWT, Bearer,
+    DB URLs com credenciais, blocos PEM)
+  - prompt-injection (override de instruções, role override, `<|system|>`
+    style tokens)
+- [x] Integrado ao `ContextBuilder` para sanitizar apenas TARGET_FILES
+- [x] Modos `redact` (default), `block`, `audit` via
+  `AI_CONTEXT_SECURITY_MODE`
+- [x] `ContextBundle.security_findings` e `blocked_files` expõem os
+  achados ao restante do pipeline
+- [x] `AuditLog` opcional para registrar eventos `context_security_finding`
+- [x] 20 testes (17 unitários + 3 de integração no `ContextBuilder`)
+- [x] Documentação completa em `docs/security.md` e env var em
+  `docs/references.md`
 
 **Arquivos afetados**:
-- `app/core/context/context_manager.py` (sanitização)
-- `app/core/security/` (novo módulo)
-- `tests/security/` (novo)
+- `app/core/security.py` (novo)
+- `app/core/context_builder.py` (integração + audit hook)
+- `tests/test_security.py` (novo, 17 testes)
+- `tests/test_context_builder.py` (+3 testes de integração)
 - `docs/security.md` (novo)
+- `docs/references.md` (env var documentada)
 
 ---
 
