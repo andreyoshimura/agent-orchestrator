@@ -107,6 +107,7 @@ class TaskRunner:
         local_plan = planning["local_plan"]
         local_plan_object = planning["local_plan_object"]
         local_analysis = planning["local_analysis"]
+        profile_max_tokens_overrides = planning.get("profile_max_tokens_overrides")
         dependency_artifacts = self._dependency_artifacts(request, local_plan, context_info=context_info)
         cache_context = self._build_cache_context(local_plan, context_info)
         candidate_providers = [decision.provider, *decision.fallbacks]
@@ -206,6 +207,11 @@ class TaskRunner:
                 })
                 continue
 
+            provider_max_tokens = self.router.resolve_max_tokens(
+                request.task_type,
+                provider_name,
+                profile_overrides=profile_max_tokens_overrides,
+            )
             current_result, provider_attempts, provider_attempt_metrics, should_continue_to_fallback = self._run_provider_with_retry(
                 provider_name=provider_name,
                 request=request,
@@ -215,7 +221,7 @@ class TaskRunner:
                 max_provider_retries=decision.max_provider_retries,
                 fallback_on=decision.fallback_on,
                 provider_timeout_sec=decision.provider_timeout_sec,
-                provider_max_tokens=decision.provider_max_tokens,
+                provider_max_tokens=provider_max_tokens,
             )
             attempted_providers.extend(provider_attempts)
             attempt_metrics.extend(provider_attempt_metrics)
@@ -561,6 +567,9 @@ class TaskRunner:
             "local_agent_output": local_plan.local_agent_output,
         }
 
+        profile_max_tokens_overrides = runtime_project.profile.context_rules.get("provider_max_tokens")
+        if not isinstance(profile_max_tokens_overrides, dict):
+            profile_max_tokens_overrides = None
         return {
             "context": {
                 "status": context_status,
@@ -593,6 +602,7 @@ class TaskRunner:
             "local_analysis": local_analysis,
             "context_sufficiency": context_sufficiency,
             "stage_metrics": stage_metrics,
+            "profile_max_tokens_overrides": profile_max_tokens_overrides,
         }
 
     def _execute_provider(

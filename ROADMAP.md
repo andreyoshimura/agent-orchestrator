@@ -65,25 +65,29 @@ total agregado de tokens do dia ultrapassa o limite configurável.
 
 ---
 
-### #3 - Refinar limites de token por tarefa/perfil/modelo
+### #3 - Refinar limites de token por tarefa/perfil/modelo ✅
 
 **Prioridade**: 🟡 Média  
-**Status**: ⏳ Pending  
+**Status**: ✅ Completed (2026-05-20)  
 **Deps**: #1
 
-Implementar granularidade em 3 níveis: por tarefa, por perfil do projeto, por modelo.
+Hierarquia de override para `provider_max_tokens` cobrindo 7 níveis,
+do mais específico ao mais genérico (projeto.tarefa.modelo →
+projeto.tarefa → projeto.default → rota.tarefa.modelo → rota.tarefa →
+rota.defaults → fallback 2048).
 
 **Critérios de conclusão**:
-- [ ] `provider_max_tokens` suporta 3 níveis de granularidade
-- [ ] Documentado em `docs/references.md`
-- [ ] Testes cobrindo override hierarchy
-- [ ] Backwards compatible com config existente
+- [x] `provider_max_tokens` suporta 7 níveis de override
+- [x] Hierarquia documentada em `docs/references.md`
+- [x] Testes cobrindo override hierarchy (9 novos)
+- [x] Backwards compatible: comportamento default `2048` preservado
+- [x] Shorthand: `project.context_rules.provider_max_tokens.<task>` aceita inteiro
 
 **Arquivos afetados**:
-- `app/core/routing/router.py` (lógica de override)
-- `app/models/config_models.py` (schema)
-- `docs/references.md` (documentação)
-- `tests/unit/routing/` (testes)
+- `app/core/router.py` (método `resolve_max_tokens`)
+- `app/core/task_runner.py` (resolução por provider no loop)
+- `docs/references.md` (tabela e hierarquia)
+- `tests/test_router.py` (novo arquivo, 9 testes)
 
 ---
 

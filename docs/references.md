@@ -72,9 +72,27 @@ projects/<project_id>/
 |---|---|---|
 | `max_provider_retries` | `1` | Retry count before trying fallback |
 | `provider_timeout_sec` | `30` | HTTP timeout per provider call |
-| `provider_max_tokens` | `2048` | Max tokens sent to provider request |
+| `provider_max_tokens` | `2048` | Task-level max tokens sent to provider request |
+| `provider_max_tokens_by_provider` | — | Per-provider override map for `provider_max_tokens` within a task |
 | `budget_switch_threshold_ratio` | `0.25` | Proactive switch threshold based on remaining budget ratio |
 | `fallback_on` | standard fallback failures | Failure classes that allow fallback |
+
+### `provider_max_tokens` resolution hierarchy
+
+The runtime resolves `provider_max_tokens` for each (task, provider) pair
+by walking from most-specific to most-generic, picking the first positive
+integer it finds:
+
+1. `project.context_rules.provider_max_tokens.<task>.by_provider.<provider>`
+2. `project.context_rules.provider_max_tokens.<task>.default`
+3. `project.context_rules.provider_max_tokens.default`
+4. `routing.<task>.execution.provider_max_tokens_by_provider.<provider>`
+5. `routing.<task>.execution.provider_max_tokens`
+6. `routing._defaults.provider_max_tokens`
+7. Hardcoded `2048`
+
+`project.context_rules.provider_max_tokens.<task>` also accepts a plain
+integer as shorthand for the `default` form.
 
 ## Operational state keys
 
