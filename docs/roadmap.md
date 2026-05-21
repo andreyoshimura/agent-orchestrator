@@ -62,7 +62,7 @@ Current validation: `150` passing tests
 ### Partially implemented
 
 - Generic multi-language analysis: current selection flow is strongest for Python repositories
-- Cost accounting: budget caps exist, token usage telemetry exists, but full per-model cost accounting is not complete for every provider
+- Token usage accounting: daily token telemetry and daily-token alert are in place; per-model USD cost accounting is out of scope (token-based alerting is the canonical signal)
 - Provider usage telemetry: normalized for OpenRouter, Claude, Gemini and OpenAI; cost accounting still pending
 - Streaming provider execution: not yet implemented
 - Product packaging: still closer to local engineering tool than packaged product
@@ -170,7 +170,7 @@ Current validation: `150` passing tests
 ## Current priorities
 
 1. `[x]` Normalize provider usage telemetry across Claude, Gemini and OpenAI
-2. `[x]` Add daily token/cost alert signals to `health_summary`
+2. `[x]` Add daily token limit alert signals to `health_summary`
 3. `[~]` Refine `provider_max_tokens` by task/profile/model
 4. `[~]` Harden context security against secret leakage and prompt injection
 5. `[~]` Expand file selection beyond Python

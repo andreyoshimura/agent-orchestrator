@@ -37,14 +37,14 @@ Expandir telemetria de uso de provider além de OpenRouter. Implementar extraç�
 
 ---
 
-### #2 - Adicionar alertas de token/custo ao health_summary ✅
+### #2 - Adicionar alertas de limite diário de tokens ao health_summary ✅
 
 **Prioridade**: 🔴 Alta  
 **Status**: ✅ Completed (2026-05-20)  
 **Deps**: #1 (telemetria)
 
 Integrar sinais de alerta diários para consumo de tokens. Avisos quando o
-total agregado de tokens do dia ultrapassa um limite configurável.
+total agregado de tokens do dia ultrapassa o limite configurável.
 
 **Critérios de conclusão**:
 - [x] Sinal `daily_tokens_high` adicionado ao `health_summary.signals`
@@ -59,10 +59,9 @@ total agregado de tokens do dia ultrapassa um limite configurável.
 - `docs/references.md` (env var documentada)
 - `tests/test_command_entrypoints.py` (3 novos testes)
 
-**Notas**:
-- Cost accounting (USD por modelo) ficou fora do escopo desta etapa porque
-  ainda não há catálogo de preços por modelo. Foi promovido para uma tarefa
-  futura que pode partir do total já disponível em `daily_token_total`.
+**Escopo**:
+- Alerta baseado apenas em **limite diário de tokens** (não USD). O total
+  de tokens em `daily_token_total` é o sinal canônico de consumo.
 
 ---
 
