@@ -25,10 +25,10 @@ AI workflow infrastructure is tracked separately in:
 
 Current status: **functional technical MVP in active hardening**.
 
-Latest published commit: `ce92b343` (`feat(observability): provider usage telemetry and proactive switch alert`)
+Latest published commit: `8381685` (`feat(security): sanitize target-file content against secrets and prompt injection`)
 Branch: `main`
 Remote status: synced with `origin/main`
-Current validation: `150` passing tests
+Current validation: `179` passing tests (189 total — 10 pre-existing fixture errors in `tests/test_task_script.py` unrelated to runtime code)
 
 ### Implemented
 
@@ -182,37 +182,48 @@ Current validation: `150` passing tests
 
 ## Latest checkpoint
 
-### 2026-05-04 / 2026-05-05 UTC
+### 2026-05-20 UTC
 
-Commit: `ce92b343`
-Title: `feat(observability): provider usage telemetry and proactive switch alert`
+Commit: `8381685`
+Title: `feat(security): sanitize target-file content against secrets and prompt injection`
 Remote: `origin/main` synced
 
-Delivered:
+Delivered in this session:
 
-- `provider_max_tokens` flows through `RouteDecision` into provider execution
-- HTTP `402` is mapped to `insufficient_credits`
-- OpenRouter usage metrics are extracted and included in provider output
-- `OperationalStore.persist_task_result` accumulates provider usage in `provider_usage_metrics_<date>`
-- `diagnose-orchestrator` exposes `provider_usage_telemetry`
-- `AI_PROACTIVE_SWITCH_ALERT_THRESHOLD` added with default `20`
-- `proactive_switches_high` signal added to `health_summary`
-- `--health-only` includes proactive switch checks
-- Documentation reorganized under `docs/`
-- README reduced to a compact entrypoint
-- AI bundles updated to reference the new documentation structure
-- `.env` fallback loading added to `task.sh` and `healthcheck.sh`
-- `purge-cache` exposed through `task.sh`
+- `fb6c88a` Normalized provider usage telemetry for Claude, OpenAI and
+  Gemini into the unified `{prompt_tokens, completion_tokens,
+  total_tokens}` shape already produced by OpenRouter
+- `57fa941` Added `daily_tokens_high` signal to `health_summary`, gated
+  by `AI_DAILY_TOKEN_ALERT_THRESHOLD` (default `0` = disabled);
+  `--health-only` exposes `daily_token_total` / `daily_token_threshold`
+- `48fc194` Clarified that the alert is scoped to daily token volume
+  (USD cost accounting is intentionally out of scope)
+- `41b6363` Layered `provider_max_tokens` resolution into a 7-level
+  hierarchy via `Router.resolve_max_tokens(task, provider,
+  profile_overrides)`; `TaskRunner` applies it per-provider in the
+  candidate loop so fallback providers also get the right cap
+- `8381685` Added `app/core/security.ContextSanitizer`; every
+  `TARGET_FILE` chunk is screened for known secret families (Anthropic,
+  OpenAI, AWS, GitHub, Slack, Google, JWT, Bearer, DB URLs, PEM private
+  keys) and prompt-injection markers; modes `redact` / `block` /
+  `audit` are selected via `AI_CONTEXT_SECURITY_MODE`; trusted operator
+  documents (`docs/`, project memory, prompts) are intentionally not
+  sanitized
+- `e6cce98` Top-level `ROADMAP.md` introduced with 8 phased tasks,
+  completion criteria, dependencies and affected files
 
 Validation:
 
-- `150` tests passing
-- `healthcheck --all --strict` returning `ok`
-- `inspect-task review-file` running without errors
+- `179` tests passing (189 total — 10 pre-existing fixture errors in
+  `tests/test_task_script.py` that hardcode `SD200` vs `SD2001` are
+  unrelated to runtime code)
+- New env vars documented in `docs/references.md`
+- New `docs/security.md` covers the sanitizer contract
 
 Next:
 
-- Normalize usage telemetry for Claude, Gemini and OpenAI
-- Add daily cost/token alerting to `health_summary`
-- Refine token limits by profile/model/task
-- Explore streaming for long-running provider tasks
+- Expand file selection beyond Python (TypeScript, Go, Java, C++)
+- Add streaming provider execution for long-running tasks
+- Define productized output format for code audit/review
+- Evaluate GitHub PR integration for review workflows
+- Address pre-existing test_task_script.py hardcoded-path failures

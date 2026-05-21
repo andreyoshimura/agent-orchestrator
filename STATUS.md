@@ -238,3 +238,62 @@ The `.ai_context/` files are the shared working context for OpenAI, Gemini, Code
   - opcional: mover `provider_max_tokens` para política por tarefa em `routing.<task>.execution`
   - opcional: adicionar classificação específica de erro para `HTTP 402` (insufficient credits) em providers
   - opcional: incluir telemetry de custo/tokens retornados pelo OpenRouter no `OperationalStore`
+
+## Checkpoint final desta sessão
+
+- data do checkpoint: `2026-05-20`
+- branch: `main`
+- remoto: `origin/main` sincronizado com o commit `8381685` (`feat(security): sanitize target-file content against secrets and prompt injection`)
+- suíte validada antes do push: `python3 -m unittest discover -s tests` com `189` testes totais — `179` passando e `10` erros pré-existentes em `tests/test_task_script.py` (caminho hard-coded `SD200` vs `SD2001`, não relacionado ao runtime)
+- o que foi entregue nesta sessão (4 de 8 tarefas do `ROADMAP.md`):
+  - `#1` Telemetria de uso normalizada para Claude, OpenAI e Gemini no
+    mesmo schema unificado já produzido pelo OpenRouter
+    (`{prompt_tokens, completion_tokens, total_tokens}`)
+  - `#2` Sinal `daily_tokens_high` no `health_summary`, configurável
+    via `AI_DAILY_TOKEN_ALERT_THRESHOLD` (default `0` = desabilitado);
+    `--health-only` agora expõe `daily_token_total` /
+    `daily_token_threshold` no bloco `checks`
+  - `#3` Resolução hierárquica de `provider_max_tokens` em 7 níveis
+    (`projeto.tarefa.modelo` → `projeto.tarefa` → `projeto.default` →
+    `routing.<task>.execution.provider_max_tokens_by_provider.<provider>`
+    → `routing.<task>.execution.provider_max_tokens` →
+    `routing._defaults.provider_max_tokens` → fallback `2048`); o
+    `TaskRunner` agora resolve por provider candidato no loop
+  - `#4` `ContextSanitizer` em `app/core/security.py`, integrado ao
+    `ContextBuilder` para sanitizar **apenas** TARGET_FILES; cobre
+    secrets (Anthropic, OpenAI, AWS, GitHub, Slack, Google, JWT,
+    Bearer, DB URLs, blocos PEM) e prompt-injection (override de
+    instruções, role override, `<|system|>`); modos `redact` (default)
+    / `block` / `audit` via `AI_CONTEXT_SECURITY_MODE`; documentos
+    operadores (`docs/`, project memory, prompts) ficam intactos por
+    design
+- documentação consolidada:
+  - `ROADMAP.md` no topo com 8 tarefas estruturadas (`e6cce98`)
+  - `docs/security.md` (novo) com contrato completo do sanitizer
+  - `docs/references.md` atualizado com `AI_DAILY_TOKEN_ALERT_THRESHOLD`,
+    `AI_CONTEXT_SECURITY_MODE` e tabela de hierarquia de
+    `provider_max_tokens`
+- commits publicados nesta sessão em `main`:
+  - `fb6c88a feat(providers): normalize usage telemetry for Claude, OpenAI and Gemini`
+  - `e6cce98 docs: add structured ROADMAP with 8 phased development tasks`
+  - `57fa941 feat(observability): daily token alert signal in health_summary`
+  - `48fc194 docs: clarify alert scope as daily token limit (not USD cost)`
+  - `41b6363 feat(routing): resolve provider_max_tokens through a 7-level hierarchy`
+  - `8381685 feat(security): sanitize target-file content against secrets and prompt injection`
+- progresso global do roadmap: `4/8` tarefas concluídas (50%)
+- ponto exato para retomar amanhã:
+  - `#5` Expandir seleção de arquivos para além de Python (TypeScript,
+    Go, Java, C++) — começa pelo `file_selector` e pelas heuristics
+    de ranking
+  - `#6` Streaming de execução para tarefas longas (Claude/OpenAI
+    primeiro), com pipeline que suporte interrupção graceful
+  - `#7` Formato de output produtizado para auditorias/revisões
+    (schema JSON estável + template de relatório)
+  - `#8` Avaliação da integração com GitHub PR (depende de `#7`)
+- backlog técnico identificado:
+  - corrigir `tests/test_task_script.py:238` (caminho hard-coded
+    `SD200`) que está bloqueando os 10 testes E2E de subprocess
+  - quando houver demanda real, expandir `ContextSanitizer` com
+    regras opt-in via `project.yaml` (gancho já existe no construtor)
+  - quando houver catálogo de preços por modelo, dá pra reativar a
+    discussão de custo USD em cima de `daily_token_total`

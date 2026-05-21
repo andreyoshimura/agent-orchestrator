@@ -6,9 +6,12 @@ Generic AI agent orchestrator for local repositories. Routes tasks between multi
 
 - Functional technical MVP in active hardening
 - Multi-provider routing, fallback, cache, budget and diagnostics are implemented
-- Provider usage telemetry and proactive switch alerts are available
-- Current validation: `150` passing tests
-- Latest published checkpoint: `ce92b343`
+- Provider usage telemetry normalized across Claude, OpenAI, Gemini and OpenRouter
+- Daily token-limit alerting wired into `health_summary`
+- `provider_max_tokens` resolved through a layered task/profile/model hierarchy
+- Target-file content is sanitized for secrets and prompt-injection markers
+- Current validation: `179` passing tests (189 total, 10 pre-existing fixture errors)
+- Latest published checkpoint: `8381685`
 
 ## Quick start
 
