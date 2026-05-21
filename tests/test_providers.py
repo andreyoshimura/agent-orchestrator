@@ -480,6 +480,113 @@ class ProviderTest(unittest.TestCase):
         payload = __import__("json").loads(req.data.decode("utf-8"))
         self.assertEqual(payload["generationConfig"]["maxOutputTokens"], 4096)
 
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_extracts_usage_metrics(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"id":"msg_1","content":[{"type":"text","text":"ok"}],'
+            b'"usage":{"input_tokens":12,"output_tokens":7}}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        usage = response.output.get("usage")
+        self.assertEqual(usage, {"prompt_tokens": 12, "completion_tokens": 7, "total_tokens": 19})
+
+    @patch("app.providers.claude_provider.urllib_request.urlopen")
+    def test_claude_provider_omits_usage_when_absent(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"msg_1","content":[{"type":"text","text":"ok"}]}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "claude",
+            ProviderSettings(name="claude", enabled=True, model="claude-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        self.assertNotIn("usage", response.output)
+
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_extracts_usage_metrics(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"id":"resp_1","output_text":"ok",'
+            b'"usage":{"input_tokens":20,"output_tokens":8,"total_tokens":28}}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        usage = response.output.get("usage")
+        self.assertEqual(usage, {"prompt_tokens": 20, "completion_tokens": 8, "total_tokens": 28})
+
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_extracts_usage_metrics_legacy_keys(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"id":"resp_1","output_text":"ok",'
+            b'"usage":{"prompt_tokens":3,"completion_tokens":4,"total_tokens":7}}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        usage = response.output.get("usage")
+        self.assertEqual(usage, {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7})
+
+    @patch("app.providers.openai_provider.urllib_request.urlopen")
+    def test_openai_provider_omits_usage_when_absent(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"id":"resp_1","output_text":"ok"}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "openai",
+            ProviderSettings(name="openai", enabled=True, model="gpt-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        self.assertNotIn("usage", response.output)
+
+    @patch("app.providers.gemini_provider.urllib_request.urlopen")
+    def test_gemini_provider_extracts_usage_metrics(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = (
+            b'{"candidates":[{"content":{"parts":[{"text":"ok"}]}}],'
+            b'"usageMetadata":{"promptTokenCount":15,"candidatesTokenCount":6,"totalTokenCount":21}}'
+        )
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "gemini",
+            ProviderSettings(name="gemini", enabled=True, model="gemini-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        usage = response.output.get("usage")
+        self.assertEqual(usage, {"prompt_tokens": 15, "completion_tokens": 6, "total_tokens": 21})
+
+    @patch("app.providers.gemini_provider.urllib_request.urlopen")
+    def test_gemini_provider_omits_usage_when_absent(self, mock_urlopen: MagicMock) -> None:
+        response_handle = MagicMock()
+        response_handle.read.return_value = b'{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}'
+        mock_urlopen.return_value.__enter__.return_value = response_handle
+        provider = get_provider(
+            "gemini",
+            ProviderSettings(name="gemini", enabled=True, model="gemini-test", api_key="secret", api_base=""),
+        )
+        response = provider.run(ProviderRequest(prompt="hello", metadata={"task_type": "test"}))
+        self.assertEqual(response.status, "completed")
+        self.assertNotIn("usage", response.output)
+
 
 if __name__ == "__main__":
     unittest.main()

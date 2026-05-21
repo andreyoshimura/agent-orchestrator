@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 from urllib import error, parse as urllib_parse, request as urllib_request
 
 from app.providers.base import BaseProvider, ProviderRequest, ProviderResponse
@@ -132,16 +133,45 @@ class GeminiProvider(BaseProvider):
                     if text:
                         output_text_parts.append(text)
 
+        usage_metrics = _extract_usage_metrics(data.get("usageMetadata"))
+
+        output: Dict[str, object] = {
+            "mode": "live",
+            "model": self.settings.model,
+            "output_text": "\n".join(output_text_parts).strip(),
+            "raw": data,
+        }
+        if usage_metrics is not None:
+            output["usage"] = usage_metrics
+
         return ProviderResponse(
             provider=self.name,
             status="completed",
-            output={
-                "mode": "live",
-                "model": self.settings.model,
-                "output_text": "\n".join(output_text_parts).strip(),
-                "raw": data,
-            },
+            output=output,
         )
+
+
+def _extract_usage_metrics(usage: object) -> Dict[str, int] | None:
+    if not isinstance(usage, dict):
+        return None
+    prompt_tokens = _coerce_int(usage.get("promptTokenCount"))
+    completion_tokens = _coerce_int(usage.get("candidatesTokenCount"))
+    total_tokens_raw = usage.get("totalTokenCount")
+    total_tokens = _coerce_int(total_tokens_raw) if total_tokens_raw is not None else prompt_tokens + completion_tokens
+    if prompt_tokens == 0 and completion_tokens == 0 and total_tokens == 0:
+        return None
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def _coerce_int(raw_value: object) -> int:
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _http_failure_type(status_code: int) -> str:

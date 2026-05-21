@@ -1,4 +1,5 @@
 import json
+from typing import Dict
 from urllib import error, request as urllib_request
 
 from app.providers.base import BaseProvider, ProviderRequest, ProviderResponse
@@ -131,17 +132,44 @@ class ClaudeProvider(BaseProvider):
             if isinstance(item, dict) and item.get("type") == "text":
                 output_text_parts.append(str(item.get("text", "")))
 
+        usage_metrics = _extract_usage_metrics(data.get("usage"))
+
+        output: Dict[str, object] = {
+            "mode": "live",
+            "model": self.settings.model,
+            "response_id": data.get("id"),
+            "output_text": "\n".join(part for part in output_text_parts if part).strip(),
+            "raw": data,
+        }
+        if usage_metrics is not None:
+            output["usage"] = usage_metrics
+
         return ProviderResponse(
             provider=self.name,
             status="completed",
-            output={
-                "mode": "live",
-                "model": self.settings.model,
-                "response_id": data.get("id"),
-                "output_text": "\n".join(part for part in output_text_parts if part).strip(),
-                "raw": data,
-            },
+            output=output,
         )
+
+
+def _extract_usage_metrics(usage: object) -> Dict[str, int] | None:
+    if not isinstance(usage, dict):
+        return None
+    prompt_tokens = _coerce_int(usage.get("input_tokens"))
+    completion_tokens = _coerce_int(usage.get("output_tokens"))
+    if prompt_tokens == 0 and completion_tokens == 0:
+        return None
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": prompt_tokens + completion_tokens,
+    }
+
+
+def _coerce_int(raw_value: object) -> int:
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _http_failure_type(status_code: int) -> str:

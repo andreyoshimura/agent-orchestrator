@@ -63,7 +63,7 @@ Current validation: `150` passing tests
 
 - Generic multi-language analysis: current selection flow is strongest for Python repositories
 - Cost accounting: budget caps exist, token usage telemetry exists, but full per-model cost accounting is not complete for every provider
-- Provider usage telemetry: strongest for OpenRouter; should be expanded/normalized for Claude, Gemini and OpenAI
+- Provider usage telemetry: normalized for OpenRouter, Claude, Gemini and OpenAI; cost accounting still pending
 - Streaming provider execution: not yet implemented
 - Product packaging: still closer to local engineering tool than packaged product
 - Context security hardening: needs more explicit guardrails against secret leakage and prompt injection from repository content
@@ -169,7 +169,7 @@ Current validation: `150` passing tests
 
 ## Current priorities
 
-1. `[~]` Normalize provider usage telemetry across Claude, Gemini and OpenAI
+1. `[x]` Normalize provider usage telemetry across Claude, Gemini and OpenAI
 2. `[~]` Add daily token/cost alert signals to `health_summary`
 3. `[~]` Refine `provider_max_tokens` by task/profile/model
 4. `[~]` Harden context security against secret leakage and prompt injection
